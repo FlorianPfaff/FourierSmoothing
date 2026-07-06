@@ -21,9 +21,10 @@ It includes:
 - a generic grid-based backward-information smoother,
 - a periodic-grid transition for the additive identity model on `T^d`,
 - FFT helpers for complex Fourier coefficients in NumPy order,
+- aliasing-free Fourier multiplication by linear coefficient convolution and truncation,
 - a first Fourier identity smoother for additive torus dynamics,
 - a small reproducible benchmark writer for paper result CSVs,
-- tests for the identity-transition case and the Fourier/grid equivalence of the backward prediction.
+- tests for identity and diffusive transition cases.
 
 ## Install
 
@@ -43,6 +44,12 @@ Run experiment code from this repository, but write generated outputs to the pap
 
 ```bash
 python scripts/run_identity_torus_experiment.py --output-dir ../2026-07-FourierSmoothing-Paper/results --grid-sizes 15 31 63 127 --repetitions 5
+```
+
+The default Fourier multiplication mode is `truncated_convolution`, which performs an aliasing-free coefficient convolution followed by truncation. To reproduce same-grid multiplication exactly, add:
+
+```bash
+--fourier-multiplication grid
 ```
 
 The script writes `identity_torus_benchmark.csv` unless another filename is supplied.
@@ -86,4 +93,4 @@ smoothed = result.smoothed
 
 ## Scope
 
-This is deliberately a first implementation. The multiplication of Fourier coefficient arrays is currently implemented through grid transforms for clarity. A later optimized version can replace this with zero-padded/truncated coefficient convolutions and add spherical-harmonic support.
+This is deliberately a first implementation. The Fourier smoother now has both an aliasing-free truncated coefficient-convolution path and a grid-transform path. The grid-transform path remains useful for diagnostics and equivalence checks against grid smoothers.
