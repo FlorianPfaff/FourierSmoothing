@@ -13,6 +13,8 @@ dependencies = ["numpy>=1.23"]
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
+plot = ["matplotlib>=3.8"]
+paper = ["pytest>=7", "matplotlib>=3.8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
