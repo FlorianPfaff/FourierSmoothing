@@ -26,9 +26,9 @@ def test_filtered_from_likelihoods_normalizes_each_step():
 
 
 def test_identity_torus_benchmark_writes_csv(tmp_path):
-    rows = run_identity_torus_benchmark([9], repetitions=2, time_steps=3)
+    rows = run_identity_torus_benchmark([9], repetitions=2, time_steps=3, fourier_multiplication="grid")
     assert len(rows) == 4
-    assert {row.method for row in rows} == {"grid", "fourier_identity"}
+    assert {row.method for row in rows} == {"grid", "fourier_identity_grid"}
     assert max(row.max_abs_difference_to_grid for row in rows) < 1e-10
     assert max(row.max_normalization_error for row in rows) < 1e-10
 
@@ -36,4 +36,10 @@ def test_identity_torus_benchmark_writes_csv(tmp_path):
     with output_path.open(newline="", encoding="utf-8") as handle:
         loaded_rows = list(csv.DictReader(handle))
     assert len(loaded_rows) == len(rows)
-    assert loaded_rows[0]["method"] in {"grid", "fourier_identity"}
+    assert loaded_rows[0]["method"] in {"grid", "fourier_identity_grid"}
+
+
+def test_identity_torus_benchmark_default_uses_truncated_convolution():
+    rows = run_identity_torus_benchmark([9], repetitions=1, time_steps=3)
+    assert {row.method for row in rows} == {"grid", "fourier_identity_truncated_convolution"}
+    assert max(row.max_normalization_error for row in rows) < 1e-10
