@@ -2,6 +2,8 @@
 
 Experimental reference implementation of fixed-interval smoothing for Fourier/grid filters on hypertori.
 
+This repository is for **code**: Python package code, experiment scripts, tests, and reusable numerical utilities. Manuscript files, committed figures, and generated result tables belong in the separate `FlorianPfaff/2026-07-FourierSmoothing-Paper` repository.
+
 The current implementation focuses on the backward-information smoother
 
 ```math
@@ -20,6 +22,7 @@ It includes:
 - a periodic-grid transition for the additive identity model on `T^d`,
 - FFT helpers for complex Fourier coefficients in NumPy order,
 - a first Fourier identity smoother for additive torus dynamics,
+- a small reproducible benchmark writer for paper result CSVs,
 - tests for the identity-transition case and the Fourier/grid equivalence of the backward prediction.
 
 ## Install
@@ -33,6 +36,16 @@ python -m pip install -e .[test]
 ```bash
 pytest
 ```
+
+## Generate paper results
+
+Run experiment code from this repository, but write generated outputs to the paper repository:
+
+```bash
+python scripts/run_identity_torus_experiment.py --output-dir ../2026-07-FourierSmoothing-Paper/results --grid-sizes 15 31 63 127 --repetitions 5
+```
+
+The script writes `identity_torus_benchmark.csv` unless another filename is supplied.
 
 ## Minimal example
 
