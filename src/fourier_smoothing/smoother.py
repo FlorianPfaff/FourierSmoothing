@@ -151,12 +151,43 @@ def grid_to_fourier(values: ArrayLike) -> NDArray[np.complex128]:
     return np.fft.fftn(arr) / arr.size
 
 
-def fourier_to_grid(coefficients: ArrayLike, *, real: bool = True):
-    """Evaluate Fourier coefficients on the matching equidistant grid."""
+def fourier_to_grid(
+    coefficients: ArrayLike,
+    *,
+    grid_shape: Iterable[int] | None = None,
+    real: bool = True,
+):
+    """Evaluate Fourier coefficients on an equidistant grid.
+
+    If ``grid_shape`` is omitted, the coefficient shape is used. If
+    ``grid_shape`` is larger, the coefficient tensor is zero-padded in the
+    centered frequency ordering before evaluation. If it is smaller, the
+    coefficient tensor is center-truncated.
+    """
 
     coeffs = np.asarray(coefficients, dtype=np.complex128)
+    if grid_shape is not None:
+        coeffs = resize_fourier_coefficients(coeffs, grid_shape)
     values = np.fft.ifftn(coeffs * coeffs.size)
     return values.real if real else values
+
+
+def resize_fourier_coefficients(coefficients: ArrayLike, output_shape: Iterable[int]) -> NDArray[np.complex128]:
+    """Center-pad or center-crop FFT-order Fourier coefficients to ``output_shape``."""
+
+    coeffs = np.asarray(coefficients, dtype=np.complex128)
+    if coeffs.ndim == 0:
+        raise ValueError("coefficients must have at least one dimension")
+    output_shape = _shape_tuple(output_shape)
+    if len(output_shape) != coeffs.ndim:
+        raise ValueError(f"output_shape must have length {coeffs.ndim}, got {len(output_shape)}")
+    return np.fft.ifftshift(_center_pad_or_crop(np.fft.fftshift(coeffs), output_shape))
+
+
+def truncate_fourier_coefficients(coefficients: ArrayLike, output_shape: Iterable[int]) -> NDArray[np.complex128]:
+    """Alias for :func:`resize_fourier_coefficients` for explicit truncation sites."""
+
+    return resize_fourier_coefficients(coefficients, output_shape)
 
 
 def reverse_frequencies(coefficients: ArrayLike) -> NDArray[np.complex128]:
