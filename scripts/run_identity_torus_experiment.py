@@ -21,6 +21,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repetitions", type=int, default=5)
     parser.add_argument("--time-steps", type=int, default=4)
     parser.add_argument("--noise-concentration", type=float, default=3.0)
+    parser.add_argument(
+        "--fourier-multiplication",
+        choices=["truncated_convolution", "grid"],
+        default="truncated_convolution",
+        help="Coefficient multiplication used by the Fourier smoother.",
+    )
     parser.add_argument("--filename", default="identity_torus_benchmark.csv")
     return parser.parse_args()
 
@@ -32,6 +38,7 @@ def main() -> None:
         repetitions=args.repetitions,
         time_steps=args.time_steps,
         noise_concentration=args.noise_concentration,
+        fourier_multiplication=args.fourier_multiplication,
     )
     output_path = write_benchmark_csv(rows, args.output_dir / args.filename)
     print(output_path)
