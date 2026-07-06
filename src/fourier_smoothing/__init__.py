@@ -21,9 +21,11 @@ from .smoother import (
     multiply_fourier_via_grid,
     normalize_fourier_density,
     normalize_grid_density,
+    resize_fourier_coefficients,
     reverse_frequencies,
     torus_grid,
     torus_identity_backward_predict_fourier,
+    truncate_fourier_coefficients,
 )
 
 __all__ = [
@@ -43,9 +45,11 @@ __all__ = [
     "multiply_fourier_via_grid",
     "normalize_fourier_density",
     "normalize_grid_density",
+    "resize_fourier_coefficients",
     "reverse_frequencies",
     "run_identity_torus_benchmark",
     "torus_grid",
     "torus_identity_backward_predict_fourier",
+    "truncate_fourier_coefficients",
     "write_benchmark_csv",
 ]
