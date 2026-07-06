@@ -10,6 +10,7 @@ from fourier_smoothing import (
     multiply_fourier_truncated,
     multiply_fourier_via_grid,
     normalize_grid_density,
+    resize_fourier_coefficients,
     reverse_frequencies,
     torus_grid,
     torus_identity_backward_predict_fourier,
@@ -180,6 +181,22 @@ def test_multiply_fourier_truncated_matches_grid_product_when_band_limited_produ
 
     product_coeffs = multiply_fourier_truncated(grid_to_fourier(f), grid_to_fourier(g))
     np.testing.assert_allclose(fourier_to_grid(product_coeffs), f * g, rtol=1e-12, atol=1e-12)
+
+
+def test_fourier_coefficients_can_be_resized_for_dense_evaluation():
+    coarse_shape = (5,)
+    dense_shape = (31,)
+    (x_coarse,) = torus_grid(coarse_shape)
+    (x_dense,) = torus_grid(dense_shape)
+    values = 1.0 + 0.2 * np.cos(2.0 * x_coarse - 0.3)
+    expected_dense = 1.0 + 0.2 * np.cos(2.0 * x_dense - 0.3)
+
+    coeffs = grid_to_fourier(values)
+    dense_values = fourier_to_grid(coeffs, grid_shape=dense_shape)
+    resized = resize_fourier_coefficients(coeffs, dense_shape)
+
+    np.testing.assert_allclose(dense_values, expected_dense, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(fourier_to_grid(resized), expected_dense, rtol=1e-12, atol=1e-12)
 
 
 def test_reverse_frequencies_negates_frequency_indices():
