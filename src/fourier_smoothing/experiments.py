@@ -106,12 +106,14 @@ def run_identity_torus_benchmark(
     repetitions: int = 3,
     time_steps: int = 4,
     noise_concentration: float = 3.0,
+    fourier_multiplication: str = "truncated_convolution",
 ) -> list[BenchmarkRow]:
     """Benchmark grid and Fourier smoothers for a 1-D additive identity model.
 
-    The benchmark intentionally checks the Fourier smoother against the grid
-    smoother on the same equidistant grid. It is intended as a regression and
-    results-generation utility, not as a comprehensive performance study.
+    The grid row is a discretized reference on the same equidistant grid. The
+    Fourier row uses ``fourier_multiplication``; the default is the aliasing-free
+    coefficient convolution followed by truncation. Use ``"grid"`` to reproduce
+    the grid-transform multiplication exactly.
     """
 
     if repetitions < 1:
@@ -148,13 +150,18 @@ def run_identity_torus_benchmark(
             )
 
             start = time.perf_counter()
-            fourier_result = fourier_identity_smoother(filtered_coeffs, likelihood_coeffs, noise_coeffs)
+            fourier_result = fourier_identity_smoother(
+                filtered_coeffs,
+                likelihood_coeffs,
+                noise_coeffs,
+                multiplication=fourier_multiplication,
+            )
             fourier_runtime = time.perf_counter() - start
             fourier_grid = np.stack([fourier_to_grid(coeffs) for coeffs in fourier_result.smoothed_coefficients], axis=0)
             fourier_norm_error = _max_grid_normalization_error(fourier_grid, cell_volume)
             rows.append(
                 BenchmarkRow(
-                    method="fourier_identity",
+                    method=f"fourier_identity_{fourier_multiplication}",
                     grid_size=grid_size,
                     repetition=repetition,
                     runtime_s=fourier_runtime,
