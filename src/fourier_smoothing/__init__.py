@@ -2,11 +2,15 @@
 
 from .experiments import (
     BenchmarkRow,
+    NegativityDiagnosticRow,
     filtered_from_likelihoods,
     make_identity_likelihoods,
+    make_sharp_multimodal_likelihoods,
     make_von_mises_like_noise,
     run_identity_torus_benchmark,
+    run_truncation_negativity_diagnostic,
     write_benchmark_csv,
+    write_negativity_csv,
 )
 from .smoother import (
     FourierSmoothingResult,
@@ -32,6 +36,7 @@ __all__ = [
     "BenchmarkRow",
     "FourierSmoothingResult",
     "GridSmoothingResult",
+    "NegativityDiagnosticRow",
     "TorusAdditiveGridTransition",
     "cell_volume_for_grid",
     "filtered_from_likelihoods",
@@ -40,6 +45,7 @@ __all__ = [
     "grid_backward_information_smoother",
     "grid_to_fourier",
     "make_identity_likelihoods",
+    "make_sharp_multimodal_likelihoods",
     "make_von_mises_like_noise",
     "multiply_fourier_truncated",
     "multiply_fourier_via_grid",
@@ -48,8 +54,10 @@ __all__ = [
     "resize_fourier_coefficients",
     "reverse_frequencies",
     "run_identity_torus_benchmark",
+    "run_truncation_negativity_diagnostic",
     "torus_grid",
     "torus_identity_backward_predict_fourier",
     "truncate_fourier_coefficients",
     "write_benchmark_csv",
+    "write_negativity_csv",
 ]
