@@ -1,5 +1,13 @@
 """Reference implementation of Fourier/grid fixed-interval smoothing."""
 
+from .experiments import (
+    BenchmarkRow,
+    filtered_from_likelihoods,
+    make_identity_likelihoods,
+    make_von_mises_like_noise,
+    run_identity_torus_benchmark,
+    write_benchmark_csv,
+)
 from .smoother import (
     FourierSmoothingResult,
     GridSmoothingResult,
@@ -18,18 +26,24 @@ from .smoother import (
 )
 
 __all__ = [
+    "BenchmarkRow",
     "FourierSmoothingResult",
     "GridSmoothingResult",
     "TorusAdditiveGridTransition",
     "cell_volume_for_grid",
+    "filtered_from_likelihoods",
     "fourier_identity_smoother",
     "fourier_to_grid",
     "grid_backward_information_smoother",
     "grid_to_fourier",
+    "make_identity_likelihoods",
+    "make_von_mises_like_noise",
     "multiply_fourier_via_grid",
     "normalize_fourier_density",
     "normalize_grid_density",
     "reverse_frequencies",
+    "run_identity_torus_benchmark",
     "torus_grid",
     "torus_identity_backward_predict_fourier",
+    "write_benchmark_csv",
 ]
