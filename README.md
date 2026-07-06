@@ -22,14 +22,22 @@ It includes:
 - a periodic-grid transition for the additive identity model on `T^d`,
 - FFT helpers for complex Fourier coefficients in NumPy order,
 - aliasing-free Fourier multiplication by linear coefficient convolution and truncation,
+- dense-grid evaluation of truncated Fourier coefficient tensors,
 - a first Fourier identity smoother for additive torus dynamics,
-- a small reproducible benchmark writer for paper result CSVs,
-- tests for identity and diffusive transition cases.
+- reproducible benchmark and truncation-negativity diagnostic writers for paper result CSVs,
+- plotting scripts that write figures to the paper repository,
+- tests for identity, diffusive transition, aliasing, and truncation-diagnostic cases.
 
 ## Install
 
 ```bash
 python -m pip install -e .[test]
+```
+
+For paper figures, install the plotting extra:
+
+```bash
+python -m pip install -e .[paper]
 ```
 
 ## Run tests
@@ -44,15 +52,25 @@ Run experiment code from this repository, but write generated outputs to the pap
 
 ```bash
 python scripts/run_identity_torus_experiment.py --output-dir ../2026-07-FourierSmoothing-Paper/results --grid-sizes 15 31 63 127 --repetitions 5
+
+python scripts/run_truncation_negativity_diagnostic.py --output-dir ../2026-07-FourierSmoothing-Paper/results --k-max-values 1 2 3 5 8 12 16 --sharpness-values 2 5 9 13
 ```
 
-The default Fourier multiplication mode is `truncated_convolution`, which performs an aliasing-free coefficient convolution followed by truncation. To reproduce same-grid multiplication exactly, add:
+The identity benchmark writes `identity_torus_benchmark.csv`. The truncation diagnostic writes `truncation_negativity_diagnostic.csv`.
+
+The default Fourier multiplication mode is `truncated_convolution`, which performs an aliasing-free coefficient convolution followed by truncation. To reproduce same-grid multiplication exactly in the identity benchmark, add:
 
 ```bash
 --fourier-multiplication grid
 ```
 
-The script writes `identity_torus_benchmark.csv` unless another filename is supplied.
+## Generate paper figures
+
+After generating CSV results, create figures in the paper repository via:
+
+```bash
+python scripts/plot_paper_results.py --results-dir ../2026-07-FourierSmoothing-Paper/results --figures-dir ../2026-07-FourierSmoothing-Paper/figures
+```
 
 ## Minimal example
 
