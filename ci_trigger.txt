@@ -1,1 +1,3 @@
 Trigger self-hosted CI workflow on a pull request.
+
+Retriggered after targeting labels: self-hosted, Linux, X64, nvidia-smi.
