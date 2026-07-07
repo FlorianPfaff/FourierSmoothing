@@ -1,0 +1,1 @@
+Trigger compact pytest diagnostic workflow from current main.
