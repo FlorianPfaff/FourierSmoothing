@@ -24,12 +24,15 @@ def main() -> None:
 
     identity_csv = args.results_dir / "identity_torus_benchmark.csv"
     negativity_csv = args.results_dir / "truncation_negativity_diagnostic.csv"
+    particle_csv = args.results_dir / "particle_smoother_baseline.csv"
 
     written = []
     if identity_csv.exists():
         written.extend(_plot_identity_benchmark(identity_csv, args.figures_dir, args.formats))
     if negativity_csv.exists():
         written.extend(_plot_negativity_diagnostic(negativity_csv, args.figures_dir, args.formats))
+    if particle_csv.exists():
+        written.extend(_plot_particle_baseline(particle_csv, args.figures_dir, args.formats))
 
     if not written:
         raise FileNotFoundError(
@@ -117,6 +120,45 @@ def _plot_negativity_diagnostic(csv_path: Path, figures_dir: Path, formats: list
     ax.legend()
     ax.grid(True, alpha=0.3)
     written.extend(_save_all(fig, figures_dir / "truncation_l1_error", formats))
+    plt.close(fig)
+
+    return written
+
+
+def _plot_particle_baseline(csv_path: Path, figures_dir: Path, formats: list[str]) -> list[Path]:
+    import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
+
+    grouped_runtime: dict[int, list[float]] = defaultdict(list)
+    grouped_mean_error: dict[int, list[float]] = defaultdict(list)
+    grouped_max_error: dict[int, list[float]] = defaultdict(list)
+    with csv_path.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            n_particles = int(row["n_particles"])
+            grouped_runtime[n_particles].append(float(row["runtime_s"]))
+            grouped_mean_error[n_particles].append(float(row["mean_abs_circular_error_to_grid"]))
+            grouped_max_error[n_particles].append(float(row["max_abs_circular_error_to_grid"]))
+
+    n_values = sorted(grouped_runtime)
+    written = []
+
+    fig, ax = plt.subplots()
+    ax.plot(n_values, [mean(grouped_runtime[n]) for n in n_values], marker="o")
+    ax.set_xlabel("number of particles")
+    ax.set_ylabel("runtime per smoothing run [s]")
+    ax.set_title("Particle smoother runtime")
+    ax.grid(True, alpha=0.3)
+    written.extend(_save_all(fig, figures_dir / "particle_smoother_runtime", formats))
+    plt.close(fig)
+
+    fig, ax = plt.subplots()
+    ax.plot(n_values, [mean(grouped_mean_error[n]) for n in n_values], marker="o", label="mean over time")
+    ax.plot(n_values, [mean(grouped_max_error[n]) for n in n_values], marker="o", label="max over time")
+    ax.set_xlabel("number of particles")
+    ax.set_ylabel("absolute circular error to grid smoother [rad]")
+    ax.set_title("Particle smoother error to grid reference")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    written.extend(_save_all(fig, figures_dir / "particle_smoother_error", formats))
     plt.close(fig)
 
     return written
