@@ -59,6 +59,11 @@ def run_particle_baseline_benchmark(
 ) -> list[ParticleBaselineRow]:
     """Compare a torus FFBSi particle smoother to a dense-grid smoother."""
 
+    n_particles_values = tuple(int(value) for value in n_particles_values)
+    if len(n_particles_values) == 0:
+        raise ValueError("n_particles_values must contain at least one entry.")
+    if any(value <= 0 for value in n_particles_values):
+        raise ValueError("n_particles values must be positive.")
     if repetitions < 1:
         raise ValueError("repetitions must be at least one.")
     if n_trajectories <= 0:
@@ -78,12 +83,9 @@ def run_particle_baseline_benchmark(
 
     rows: list[ParticleBaselineRow] = []
     seed_sequence = np.random.SeedSequence(seed)
-    child_seeds = iter(seed_sequence.spawn(len(tuple(n_particles_values)) * repetitions))
+    child_seeds = iter(seed_sequence.spawn(len(n_particles_values) * repetitions))
 
     for n_particles in n_particles_values:
-        n_particles = int(n_particles)
-        if n_particles <= 0:
-            raise ValueError("n_particles values must be positive.")
         for repetition in range(repetitions):
             rng = np.random.default_rng(next(child_seeds))
             start = time.perf_counter()
