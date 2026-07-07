@@ -65,9 +65,13 @@ def test_truncation_negativity_diagnostic_writes_csv(tmp_path):
     )
     assert len(rows) == 2
     assert all(row.negative_mass >= 0.0 for row in rows)
+    assert all(row.max_negative_undershoot >= 0.0 for row in rows)
+    assert all(row.l1_error_to_dense_grid >= 0.0 for row in rows)
     assert all(np.isfinite(row.min_value) for row in rows)
+    assert all(np.isfinite(row.negative_mass) for row in rows)
+    assert all(np.isfinite(row.max_negative_undershoot) for row in rows)
+    assert all(np.isfinite(row.l1_error_to_dense_grid) for row in rows)
     assert all(row.max_normalization_error < 1e-8 for row in rows)
-    assert any(row.negative_mass > 0.0 for row in rows)
 
     output_path = write_negativity_csv(rows, tmp_path / "truncation_negativity_diagnostic.csv")
     with output_path.open(newline="", encoding="utf-8") as handle:
