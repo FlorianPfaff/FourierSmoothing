@@ -9,7 +9,7 @@ on:
 jobs:
   pytest:
     name: Python tests
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64, nvidia-smi]
     timeout-minutes: 30
 
     steps:
@@ -21,6 +21,7 @@ jobs:
           uname -a || true
           python --version
           which python
+          nvidia-smi || true
 
       - name: Install package with paper/test extras
         run: |
