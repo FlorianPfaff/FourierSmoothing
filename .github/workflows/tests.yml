@@ -21,24 +21,20 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Show runner environment
-        run: |
-          uname -a || true
-          python --version
-          which python
-
       - name: Install package with paper/test extras
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e '.[paper]'
+          python -m pip install -q --upgrade pip
+          python -m pip install -q -e '.[paper]'
 
-      - name: Run pytest
+      - name: Run pytest with compact diagnostics
         run: |
           mkdir -p .ci_logs
           set +e
-          PYTHONPATH=src pytest -q 2>&1 | tee .ci_logs/pytest.log
+          PYTHONPATH=src pytest -q --tb=short 2>&1 | tee .ci_logs/pytest.log
           status=${PIPESTATUS[0]}
           echo "${status}" > .ci_logs/pytest_exit_code.txt
+          echo "--- pytest tail ---"
+          tail -120 .ci_logs/pytest.log
           exit "${status}"
 
       - name: Upload pytest diagnostics
