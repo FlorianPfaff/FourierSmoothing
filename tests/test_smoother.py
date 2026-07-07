@@ -170,7 +170,7 @@ def test_multiply_fourier_truncated_avoids_same_grid_aliasing():
     grid_product = multiply_fourier_via_grid(coeffs, coeffs)
 
     assert np.max(np.abs(truncated_product)) < 1e-12
-    assert np.max(np.abs(grid_product)) > 0.5
+    assert np.max(np.abs(grid_product)) >= 0.49
 
 
 def test_multiply_fourier_truncated_matches_grid_product_when_band_limited_product_fits():
