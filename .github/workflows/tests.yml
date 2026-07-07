@@ -25,7 +25,7 @@ jobs:
       - name: Install package with paper/test extras
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .[paper]
+          python -m pip install -e '.[paper]'
 
       - name: Run pytest
         run: |
@@ -48,3 +48,4 @@ jobs:
           path: |
             .ci_results/*.csv
             .ci_figures/*.png
+          if-no-files-found: error
