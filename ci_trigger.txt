@@ -1,0 +1,1 @@
+Trigger self-hosted CI workflow on a pull request.
