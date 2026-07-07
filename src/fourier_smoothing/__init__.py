@@ -23,6 +23,12 @@ from .particle import (
     systematic_resample,
     transition_density_from_noise_1d,
 )
+from .particle_experiments import (
+    ParticleBaselineRow,
+    circular_abs_difference,
+    run_particle_baseline_benchmark,
+    write_particle_baseline_csv,
+)
 from .smoother import (
     FourierSmoothingResult,
     GridSmoothingResult,
@@ -48,11 +54,13 @@ __all__ = [
     "FourierSmoothingResult",
     "GridSmoothingResult",
     "NegativityDiagnosticRow",
+    "ParticleBaselineRow",
     "ParticleFilterResult",
     "ParticleSmoothingResult",
     "TorusAdditiveGridTransition",
     "bootstrap_particle_filter_1d",
     "cell_volume_for_grid",
+    "circular_abs_difference",
     "circular_mean",
     "ffbsi_particle_smoother_1d",
     "filtered_from_likelihoods",
@@ -71,6 +79,7 @@ __all__ = [
     "resize_fourier_coefficients",
     "reverse_frequencies",
     "run_identity_torus_benchmark",
+    "run_particle_baseline_benchmark",
     "run_truncation_negativity_diagnostic",
     "sample_from_grid_density_1d",
     "systematic_resample",
@@ -80,4 +89,5 @@ __all__ = [
     "truncate_fourier_coefficients",
     "write_benchmark_csv",
     "write_negativity_csv",
+    "write_particle_baseline_csv",
 ]
