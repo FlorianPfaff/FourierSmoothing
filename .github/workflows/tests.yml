@@ -9,19 +9,23 @@ on:
 jobs:
   pytest:
     name: Python tests
-    runs-on: [self-hosted, Linux, X64, nvidia-smi]
+    runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Show runner environment
         run: |
           uname -a || true
           python --version
           which python
-          nvidia-smi || true
 
       - name: Install package with paper/test extras
         run: |
