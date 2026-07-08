@@ -25,9 +25,9 @@ It includes:
 - dense-grid evaluation of truncated Fourier coefficient tensors,
 - a first Fourier identity smoother for additive torus dynamics,
 - a one-dimensional torus bootstrap particle-filter / FFBSi particle-smoother baseline,
-- reproducible benchmark and particle-baseline writers for paper result CSVs,
+- reproducible benchmark, particle-baseline, and truncation-negativity diagnostic writers for paper result CSVs,
 - plotting scripts that write figures to the paper repository,
-- tests for identity, diffusive transition, aliasing, particle-baseline, and coefficient-space diagnostic cases.
+- tests for identity, diffusive transition, aliasing, particle-baseline, and truncation-diagnostic cases.
 
 ## Install
 
@@ -54,10 +54,12 @@ Run experiment code from this repository, but write generated outputs to the pap
 ```bash
 python scripts/run_identity_torus_experiment.py --output-dir ../2026-07-FourierSmoothing-Paper/results --grid-sizes 15 31 63 127 --repetitions 5
 
+python scripts/run_truncation_negativity_diagnostic.py --output-dir ../2026-07-FourierSmoothing-Paper/results --k-max-values 1 2 3 5 8 12 16 --sharpness-values 2 5 9 13
+
 python scripts/run_particle_baseline_experiment.py --output-dir ../2026-07-FourierSmoothing-Paper/results --n-particles-values 100 300 1000 --n-trajectories 200 --repetitions 5
 ```
 
-The identity benchmark writes `identity_torus_benchmark.csv`. The particle baseline writes `particle_smoother_baseline.csv`.
+The identity benchmark writes `identity_torus_benchmark.csv`. The truncation diagnostic writes `truncation_negativity_diagnostic.csv`. The particle baseline writes `particle_smoother_baseline.csv`.
 
 The default Fourier multiplication mode is `truncated_convolution`, which performs an aliasing-free coefficient convolution followed by truncation. To reproduce same-grid multiplication exactly in the identity benchmark, add:
 
