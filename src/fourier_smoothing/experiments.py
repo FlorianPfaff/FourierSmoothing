@@ -17,6 +17,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .smoother import (
+    DenseGridTransition,
     TorusAdditiveGridTransition,
     cell_volume_for_grid,
     fourier_identity_smoother,
@@ -79,6 +80,68 @@ class NegativityDiagnosticRow:
         }
 
 
+@dataclass(frozen=True)
+class FIGFPWCBenchmarkRow:
+    """One CSV-ready row for the FIGF/PWC smoothing comparison."""
+
+    method: str
+    grid_size: int
+    repetition: int
+    filter_runtime_s: float
+    smoother_runtime_s: float
+    evaluation_runtime_s: float
+    runtime_s: float
+    mean_l1_error_to_reference: float
+    max_l1_error_to_reference: float
+    min_evaluated_density: float
+    max_normalization_error: float
+
+    def as_dict(self) -> dict[str, str | int | float]:
+        return {
+            "method": self.method,
+            "grid_size": self.grid_size,
+            "repetition": self.repetition,
+            "filter_runtime_s": self.filter_runtime_s,
+            "smoother_runtime_s": self.smoother_runtime_s,
+            "evaluation_runtime_s": self.evaluation_runtime_s,
+            "runtime_s": self.runtime_s,
+            "mean_l1_error_to_reference": self.mean_l1_error_to_reference,
+            "max_l1_error_to_reference": self.max_l1_error_to_reference,
+            "min_evaluated_density": self.min_evaluated_density,
+            "max_normalization_error": self.max_normalization_error,
+        }
+
+
+@dataclass(frozen=True)
+class SmoothingEvaluationRow:
+    """One raw evaluation row for the smoother comparison."""
+
+    method: str
+    parameter: int
+    repetition: int
+    runtime_s: float
+    mean_error_rad: float
+    max_mean_error_rad: float
+    l1_error: float
+    max_l1_error: float
+    min_evaluated_density: float
+    max_normalization_error: float
+
+    def as_dict(self) -> dict[str, str | int | float]:
+        return {
+            "method": self.method,
+            "parameter": self.parameter,
+            "repetition": self.repetition,
+            "runtime_s": self.runtime_s,
+            "mean_error_rad": self.mean_error_rad,
+            "max_mean_error_rad": self.max_mean_error_rad,
+            "l1_error": self.l1_error,
+            "max_l1_error": self.max_l1_error,
+            "min_evaluated_density": self.min_evaluated_density,
+            "max_normalization_error": self.max_normalization_error,
+        }
+
+
 BENCHMARK_CSV_COLUMNS = [
     "method",
     "grid_size",
@@ -98,6 +161,33 @@ NEGATIVITY_CSV_COLUMNS = [
     "max_negative_undershoot",
     "max_normalization_error",
     "l1_error_to_dense_grid",
+]
+
+FIGF_PWC_CSV_COLUMNS = [
+    "method",
+    "grid_size",
+    "repetition",
+    "filter_runtime_s",
+    "smoother_runtime_s",
+    "evaluation_runtime_s",
+    "runtime_s",
+    "mean_l1_error_to_reference",
+    "max_l1_error_to_reference",
+    "min_evaluated_density",
+    "max_normalization_error",
+]
+
+SMOOTHING_EVALUATION_CSV_COLUMNS = [
+    "method",
+    "parameter",
+    "repetition",
+    "runtime_s",
+    "mean_error_rad",
+    "max_mean_error_rad",
+    "l1_error",
+    "max_l1_error",
+    "min_evaluated_density",
+    "max_normalization_error",
 ]
 
 
@@ -175,7 +265,7 @@ def make_von_mises_like_noise(grid_shape: Sequence[int], concentration: float) -
 def run_identity_torus_benchmark(
     grid_sizes: Iterable[int] = (15, 31, 63),
     *,
-    repetitions: int = 3,
+    repetitions: int = 5,
     time_steps: int = 4,
     noise_concentration: float = 3.0,
     fourier_multiplication: str = "truncated_convolution",
@@ -241,6 +331,306 @@ def run_identity_torus_benchmark(
                     max_normalization_error=fourier_norm_error,
                 )
             )
+    return rows
+
+
+def run_figf_pwc_benchmark(
+    grid_sizes: Iterable[int] = (15, 31, 63, 127, 255),
+    *,
+    repetitions: int = 5,
+    time_steps: int = 5,
+    reference_grid_size: int = 2049,
+    likelihood_sharpness: float = 5.0,
+    noise_concentration: float = 4.0,
+    pwc_quadrature_points: int = 8,
+) -> list[FIGFPWCBenchmarkRow]:
+    """Compare FIGFAN, FIGFDN, and PWC smoothed-density reconstructions.
+
+    A fine-grid FIGF smoother provides the numerical reference. For each coarse
+    grid size, the FIGF recursion is run once and evaluated through the AN and
+    DN interpolation layers. The PWC baseline uses a dense cell-averaged
+    transition matrix, i.e. the classical histogram/HMM forward-backward
+    smoother.
+    """
+
+    if repetitions < 1:
+        raise ValueError("repetitions must be at least one.")
+    if time_steps < 1:
+        raise ValueError("time_steps must be at least one.")
+    if reference_grid_size <= 0:
+        raise ValueError("reference_grid_size must be positive.")
+    if pwc_quadrature_points < 1:
+        raise ValueError("pwc_quadrature_points must be at least one.")
+
+    reference_shape = (int(reference_grid_size),)
+    reference_cell_volume = cell_volume_for_grid(reference_shape)
+    reference_likelihoods = make_sharp_multimodal_likelihoods(
+        reference_shape,
+        time_steps,
+        sharpness=likelihood_sharpness,
+    )
+    reference_noise = make_von_mises_like_noise(reference_shape, noise_concentration)
+    reference_filtered = _run_figf_forward_filter(reference_likelihoods, reference_noise, reference_cell_volume)
+    reference_transition = TorusAdditiveGridTransition.for_grid_shape(reference_noise, reference_shape)
+    reference_smoothed = grid_backward_information_smoother(
+        reference_filtered,
+        reference_likelihoods,
+        reference_transition,
+        cell_volume=reference_cell_volume,
+    ).smoothed
+
+    rows: list[FIGFPWCBenchmarkRow] = []
+    for grid_size in grid_sizes:
+        grid_size = int(grid_size)
+        if grid_size <= 0:
+            raise ValueError("grid sizes must be positive.")
+        grid_shape = (grid_size,)
+        cell_volume = cell_volume_for_grid(grid_shape)
+        likelihoods = make_sharp_multimodal_likelihoods(
+            grid_shape,
+            time_steps,
+            sharpness=likelihood_sharpness,
+        )
+        figf_noise = make_von_mises_like_noise(grid_shape, noise_concentration)
+        figf_transition = TorusAdditiveGridTransition.for_grid_shape(figf_noise, grid_shape)
+
+        pwc_transition_matrix = make_pwc_additive_transition_density_matrix_1d(
+            grid_size,
+            noise_concentration,
+            quadrature_points=pwc_quadrature_points,
+        )
+        pwc_transition = DenseGridTransition.for_grid_shape(
+            pwc_transition_matrix,
+            grid_shape,
+            cell_volume=cell_volume,
+        )
+
+        for repetition in range(repetitions):
+            figf_filter_start = time.perf_counter()
+            figf_filtered = _run_figf_forward_filter(likelihoods, figf_noise, cell_volume)
+            figf_filter_runtime = time.perf_counter() - figf_filter_start
+
+            figf_smoother_start = time.perf_counter()
+            figf_result = grid_backward_information_smoother(
+                figf_filtered,
+                likelihoods,
+                figf_transition,
+                cell_volume=cell_volume,
+            )
+            figf_smoother_runtime = time.perf_counter() - figf_smoother_start
+
+            for method, evaluator in (
+                ("FIGFAN", _evaluate_figfan_1d),
+                ("FIGFDN", _evaluate_figfdn_1d),
+            ):
+                evaluation_start = time.perf_counter()
+                evaluated = evaluator(figf_result.smoothed, reference_grid_size)
+                evaluation_runtime = time.perf_counter() - evaluation_start
+                rows.append(
+                    _make_figf_pwc_row(
+                        method=method,
+                        grid_size=grid_size,
+                        repetition=repetition,
+                        filter_runtime_s=figf_filter_runtime,
+                        smoother_runtime_s=figf_smoother_runtime,
+                        evaluation_runtime_s=evaluation_runtime,
+                        evaluated=evaluated,
+                        reference=reference_smoothed,
+                        reference_cell_volume=reference_cell_volume,
+                    )
+                )
+
+            pwc_filter_start = time.perf_counter()
+            pwc_filtered = _run_dense_transition_forward_filter(likelihoods, pwc_transition, cell_volume)
+            pwc_filter_runtime = time.perf_counter() - pwc_filter_start
+
+            pwc_smoother_start = time.perf_counter()
+            pwc_result = grid_backward_information_smoother(
+                pwc_filtered,
+                likelihoods,
+                pwc_transition,
+                cell_volume=cell_volume,
+            )
+            pwc_smoother_runtime = time.perf_counter() - pwc_smoother_start
+
+            evaluation_start = time.perf_counter()
+            pwc_evaluated = _evaluate_pwc_1d(pwc_result.smoothed, reference_grid_size)
+            evaluation_runtime = time.perf_counter() - evaluation_start
+            rows.append(
+                _make_figf_pwc_row(
+                    method="PWC",
+                    grid_size=grid_size,
+                    repetition=repetition,
+                    filter_runtime_s=pwc_filter_runtime,
+                    smoother_runtime_s=pwc_smoother_runtime,
+                    evaluation_runtime_s=evaluation_runtime,
+                    evaluated=pwc_evaluated,
+                    reference=reference_smoothed,
+                    reference_cell_volume=reference_cell_volume,
+                )
+            )
+    return rows
+
+
+def run_smoothing_evaluation(
+    figf_grid_sizes: Iterable[int] = (15, 31, 63, 127, 255, 511, 1023, 2047, 4095),
+    pwc_grid_sizes: Iterable[int] = (15, 31, 63, 127, 255, 511, 1023, 2047, 4095),
+    pf_particle_counts: Iterable[int] = (100, 300, 1000, 3000, 10000),
+    *,
+    repetitions: int = 3,
+    time_steps: int = 20,
+    likelihood_sharpness: float = 5.0,
+    noise_concentration: float = 4.0,
+    l1_reference_grid_size: int = 8193,
+    mean_reference_particles: int = 100_000,
+    particle_chunk_size: int = 100_000,
+    pwc_quadrature_points: int = 8,
+    seed: int = 1,
+) -> list[SmoothingEvaluationRow]:
+    """Evaluate FIGFAN, FIGFDN, PWC, and PF smoothers.
+
+    Mean errors are measured against a high-sample particle reference. L1
+    errors are measured against a high-resolution PWC reference density.
+    """
+
+    figf_grid_sizes = _positive_int_tuple(figf_grid_sizes, "figf_grid_sizes")
+    pwc_grid_sizes = _positive_int_tuple(pwc_grid_sizes, "pwc_grid_sizes")
+    pf_particle_counts = _positive_int_tuple(pf_particle_counts, "pf_particle_counts")
+    if repetitions < 1:
+        raise ValueError("repetitions must be at least one.")
+    if time_steps < 1:
+        raise ValueError("time_steps must be at least one.")
+    if l1_reference_grid_size <= 0:
+        raise ValueError("l1_reference_grid_size must be positive.")
+    if mean_reference_particles <= 0:
+        raise ValueError("mean_reference_particles must be positive.")
+    if particle_chunk_size <= 0:
+        raise ValueError("particle_chunk_size must be positive.")
+
+    reference_shape = (int(l1_reference_grid_size),)
+    reference_cell_volume = cell_volume_for_grid(reference_shape)
+    reference_likelihoods = make_sharp_multimodal_likelihoods(
+        reference_shape,
+        time_steps,
+        sharpness=likelihood_sharpness,
+    )
+    reference_pwc_density = _run_pwc_smoother_1d(
+        reference_likelihoods,
+        noise_concentration,
+        quadrature_points=pwc_quadrature_points,
+    )
+    mean_reference = _path_particle_smoother_summary_1d(
+        reference_likelihoods,
+        noise_concentration,
+        mean_reference_particles,
+        density_grid_size=None,
+        seed=seed,
+        chunk_size=particle_chunk_size,
+    )["means"]
+
+    rows: list[SmoothingEvaluationRow] = []
+    seed_sequence = np.random.SeedSequence(seed + 1000)
+    n_pf_runs = len(pf_particle_counts) * repetitions
+    pf_seeds = iter(seed_sequence.spawn(n_pf_runs))
+
+    for grid_size in figf_grid_sizes:
+        grid_shape = (grid_size,)
+        cell_volume = cell_volume_for_grid(grid_shape)
+        likelihoods = make_sharp_multimodal_likelihoods(
+            grid_shape,
+            time_steps,
+            sharpness=likelihood_sharpness,
+        )
+        noise = make_von_mises_like_noise(grid_shape, noise_concentration)
+        transition = TorusAdditiveGridTransition.for_grid_shape(noise, grid_shape)
+        for repetition in range(repetitions):
+            start = time.perf_counter()
+            filtered = _run_figf_forward_filter(likelihoods, noise, cell_volume)
+            result = grid_backward_information_smoother(filtered, likelihoods, transition, cell_volume=cell_volume)
+            runtime = time.perf_counter() - start
+            figfan_density = _evaluate_figfan_1d(result.smoothed, l1_reference_grid_size)
+            figfdn_density = _evaluate_figfdn_1d(result.smoothed, l1_reference_grid_size)
+            rows.append(
+                _make_smoothing_evaluation_row(
+                    method="FIGFAN",
+                    parameter=grid_size,
+                    repetition=repetition,
+                    runtime_s=runtime,
+                    evaluated=figfan_density,
+                    mean_reference=mean_reference,
+                    l1_reference=reference_pwc_density,
+                    reference_cell_volume=reference_cell_volume,
+                )
+            )
+            rows.append(
+                _make_smoothing_evaluation_row(
+                    method="FIGFDN",
+                    parameter=grid_size,
+                    repetition=repetition,
+                    runtime_s=runtime,
+                    evaluated=figfdn_density,
+                    mean_reference=mean_reference,
+                    l1_reference=reference_pwc_density,
+                    reference_cell_volume=reference_cell_volume,
+                )
+            )
+
+    for grid_size in pwc_grid_sizes:
+        grid_shape = (grid_size,)
+        likelihoods = make_sharp_multimodal_likelihoods(
+            grid_shape,
+            time_steps,
+            sharpness=likelihood_sharpness,
+        )
+        for repetition in range(repetitions):
+            start = time.perf_counter()
+            smoothed = _run_pwc_smoother_1d(
+                likelihoods,
+                noise_concentration,
+                quadrature_points=pwc_quadrature_points,
+            )
+            runtime = time.perf_counter() - start
+            evaluated = _evaluate_pwc_1d(smoothed, l1_reference_grid_size)
+            rows.append(
+                _make_smoothing_evaluation_row(
+                    method="PWC",
+                    parameter=grid_size,
+                    repetition=repetition,
+                    runtime_s=runtime,
+                    evaluated=evaluated,
+                    mean_reference=mean_reference,
+                    l1_reference=reference_pwc_density,
+                    reference_cell_volume=reference_cell_volume,
+                )
+            )
+
+    for n_particles in pf_particle_counts:
+        for repetition in range(repetitions):
+            run_seed = int(next(pf_seeds).generate_state(1)[0])
+            start = time.perf_counter()
+            particle_summary = _path_particle_smoother_summary_1d(
+                reference_likelihoods,
+                noise_concentration,
+                n_particles,
+                density_grid_size=l1_reference_grid_size,
+                seed=run_seed,
+                chunk_size=particle_chunk_size,
+            )
+            runtime = time.perf_counter() - start
+            rows.append(
+                _make_smoothing_evaluation_row(
+                    method="PF",
+                    parameter=n_particles,
+                    repetition=repetition,
+                    runtime_s=runtime,
+                    evaluated=particle_summary["density"],
+                    mean_reference=mean_reference,
+                    l1_reference=reference_pwc_density,
+                    reference_cell_volume=reference_cell_volume,
+                    means=particle_summary["means"],
+                )
+            )
+
     return rows
 
 
@@ -335,6 +725,64 @@ def write_negativity_csv(rows: Sequence[NegativityDiagnosticRow], output_path: s
     return _write_csv(rows, output_path, NEGATIVITY_CSV_COLUMNS)
 
 
+def write_figf_pwc_csv(rows: Sequence[FIGFPWCBenchmarkRow], output_path: str | Path) -> Path:
+    """Write FIGF/PWC benchmark rows to ``output_path``."""
+
+    return _write_csv(rows, output_path, FIGF_PWC_CSV_COLUMNS)
+
+
+def write_smoothing_evaluation_csv(rows: Sequence[SmoothingEvaluationRow], output_path: str | Path) -> Path:
+    """Write raw smoothing-evaluation rows to ``output_path``."""
+
+    return _write_csv(rows, output_path, SMOOTHING_EVALUATION_CSV_COLUMNS)
+
+
+def make_pwc_additive_transition_kernel_1d(
+    grid_size: int,
+    concentration: float,
+    *,
+    quadrature_points: int = 8,
+) -> NDArray[np.float64]:
+    """Cell-average an additive von-Mises transition into a circulant kernel."""
+
+    grid_size = int(grid_size)
+    quadrature_points = int(quadrature_points)
+    if grid_size <= 0:
+        raise ValueError("grid_size must be positive.")
+    if quadrature_points < 1:
+        raise ValueError("quadrature_points must be at least one.")
+
+    cell_width = 2.0 * np.pi / grid_size
+    cell_delta = cell_width * np.arange(grid_size)
+    offsets = cell_width * (np.arange(quadrature_points, dtype=float) + 0.5) / quadrature_points
+    subcell_delta = offsets[:, None] - offsets[None, :]
+    kernel = _von_mises_density_1d(
+        cell_delta[:, None, None] + subcell_delta[None, :, :],
+        concentration,
+    ).mean(axis=(1, 2))
+    return kernel / (np.sum(kernel) * cell_width)
+
+
+def make_pwc_additive_transition_density_matrix_1d(
+    grid_size: int,
+    concentration: float,
+    *,
+    quadrature_points: int = 8,
+) -> NDArray[np.float64]:
+    """Cell-average an additive von-Mises transition for a 1-D PWC basis."""
+
+    kernel = make_pwc_additive_transition_kernel_1d(
+        grid_size,
+        concentration,
+        quadrature_points=quadrature_points,
+    )
+    offsets = (np.arange(grid_size)[:, None] - np.arange(grid_size)[None, :]) % grid_size
+    transition = kernel[offsets]
+    cell_width = 2.0 * np.pi / grid_size
+    column_integrals = np.sum(transition, axis=0, keepdims=True) * cell_width
+    return transition / column_integrals
+
+
 def _write_csv(rows, output_path: str | Path, fieldnames: Sequence[str]) -> Path:
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -349,3 +797,291 @@ def _write_csv(rows, output_path: str | Path, fieldnames: Sequence[str]) -> Path
 def _max_grid_normalization_error(values: NDArray[np.float64], cell_volume: float) -> float:
     integrals = np.sum(values, axis=tuple(range(1, values.ndim))) * cell_volume
     return float(np.max(np.abs(integrals - 1.0)))
+
+
+def _run_figf_forward_filter(
+    likelihoods: NDArray[np.float64],
+    noise: NDArray[np.float64],
+    cell_volume: float,
+) -> NDArray[np.float64]:
+    filtered = []
+    current = normalize_grid_density(likelihoods[0], cell_volume)
+    filtered.append(current)
+    for likelihood in likelihoods[1:]:
+        predicted = _forward_predict_additive_fft(current, noise, cell_volume)
+        current = normalize_grid_density(predicted * likelihood, cell_volume)
+        filtered.append(current)
+    return np.stack(filtered, axis=0)
+
+
+def _run_dense_transition_forward_filter(
+    likelihoods: NDArray[np.float64],
+    transition: DenseGridTransition,
+    cell_volume: float,
+) -> NDArray[np.float64]:
+    filtered = []
+    current = normalize_grid_density(likelihoods[0], cell_volume)
+    filtered.append(current)
+    for t, likelihood in enumerate(likelihoods[1:]):
+        predicted = transition.forward_predict(current, t)
+        current = normalize_grid_density(predicted * likelihood, cell_volume)
+        filtered.append(current)
+    return np.stack(filtered, axis=0)
+
+
+def _run_pwc_smoother_1d(
+    likelihoods: NDArray[np.float64],
+    noise_concentration: float,
+    *,
+    quadrature_points: int,
+) -> NDArray[np.float64]:
+    grid_size = likelihoods.shape[1]
+    cell_volume = cell_volume_for_grid((grid_size,))
+    kernel = make_pwc_additive_transition_kernel_1d(
+        grid_size,
+        noise_concentration,
+        quadrature_points=quadrature_points,
+    )
+    filtered = _run_pwc_forward_filter(likelihoods, kernel, cell_volume)
+    result = grid_backward_information_smoother(
+        filtered,
+        likelihoods,
+        lambda message, _t: _pwc_backward_predict_fft(message, kernel, cell_volume),
+        cell_volume=cell_volume,
+    )
+    return result.smoothed
+
+
+def _run_pwc_forward_filter(
+    likelihoods: NDArray[np.float64],
+    kernel: NDArray[np.float64],
+    cell_volume: float,
+) -> NDArray[np.float64]:
+    filtered = []
+    current = normalize_grid_density(likelihoods[0], cell_volume)
+    filtered.append(current)
+    for likelihood in likelihoods[1:]:
+        predicted = _pwc_forward_predict_fft(current, kernel, cell_volume)
+        current = normalize_grid_density(predicted * likelihood, cell_volume)
+        filtered.append(current)
+    return np.stack(filtered, axis=0)
+
+
+def _pwc_forward_predict_fft(
+    density: NDArray[np.float64],
+    kernel: NDArray[np.float64],
+    cell_volume: float,
+) -> NDArray[np.float64]:
+    predicted = np.fft.ifft(np.fft.fft(kernel) * np.fft.fft(density)).real
+    return normalize_grid_density(np.maximum(predicted * cell_volume, 0.0), cell_volume)
+
+
+def _pwc_backward_predict_fft(
+    message: NDArray[np.float64],
+    kernel: NDArray[np.float64],
+    cell_volume: float,
+) -> NDArray[np.float64]:
+    predicted = np.fft.ifft(np.conj(np.fft.fft(kernel)) * np.fft.fft(message)).real
+    return np.maximum(predicted * cell_volume, 0.0)
+
+
+def _forward_predict_additive_fft(
+    density: NDArray[np.float64],
+    noise: NDArray[np.float64],
+    cell_volume: float,
+) -> NDArray[np.float64]:
+    predicted = np.fft.ifftn(np.fft.fftn(noise) * np.fft.fftn(density)).real
+    return normalize_grid_density(np.maximum(predicted * cell_volume, 0.0), cell_volume)
+
+
+def _evaluate_figfan_1d(smoothed: NDArray[np.float64], evaluation_grid_size: int) -> NDArray[np.float64]:
+    grid_shape = (int(evaluation_grid_size),)
+    return np.stack(
+        [fourier_to_grid(grid_to_fourier(values), grid_shape=grid_shape) for values in smoothed],
+        axis=0,
+    )
+
+
+def _evaluate_figfdn_1d(smoothed: NDArray[np.float64], evaluation_grid_size: int) -> NDArray[np.float64]:
+    grid_shape = (int(evaluation_grid_size),)
+    cell_volume = cell_volume_for_grid(grid_shape)
+    evaluated = []
+    for values in smoothed:
+        sqrt_values = np.sqrt(np.maximum(values, 0.0))
+        dense_sqrt = fourier_to_grid(grid_to_fourier(sqrt_values), grid_shape=grid_shape)
+        dense_values = dense_sqrt**2
+        evaluated.append(dense_values / (np.sum(dense_values) * cell_volume))
+    return np.stack(evaluated, axis=0)
+
+
+def _evaluate_pwc_1d(smoothed: NDArray[np.float64], evaluation_grid_size: int) -> NDArray[np.float64]:
+    grid_size = smoothed.shape[1]
+    dense_indices = (np.arange(evaluation_grid_size) * grid_size // evaluation_grid_size).astype(int)
+    evaluated = smoothed[:, dense_indices]
+    cell_volume = cell_volume_for_grid((int(evaluation_grid_size),))
+    integrals = np.sum(evaluated, axis=1, keepdims=True) * cell_volume
+    return evaluated / integrals
+
+
+def _make_figf_pwc_row(
+    *,
+    method: str,
+    grid_size: int,
+    repetition: int,
+    filter_runtime_s: float,
+    smoother_runtime_s: float,
+    evaluation_runtime_s: float,
+    evaluated: NDArray[np.float64],
+    reference: NDArray[np.float64],
+    reference_cell_volume: float,
+) -> FIGFPWCBenchmarkRow:
+    l1_by_time = np.sum(np.abs(evaluated - reference), axis=1) * reference_cell_volume
+    normalization_error = _max_grid_normalization_error(evaluated, reference_cell_volume)
+    return FIGFPWCBenchmarkRow(
+        method=method,
+        grid_size=grid_size,
+        repetition=repetition,
+        filter_runtime_s=filter_runtime_s,
+        smoother_runtime_s=smoother_runtime_s,
+        evaluation_runtime_s=evaluation_runtime_s,
+        runtime_s=filter_runtime_s + smoother_runtime_s + evaluation_runtime_s,
+        mean_l1_error_to_reference=float(np.mean(l1_by_time)),
+        max_l1_error_to_reference=float(np.max(l1_by_time)),
+        min_evaluated_density=float(np.min(evaluated)),
+        max_normalization_error=normalization_error,
+    )
+
+
+def _make_smoothing_evaluation_row(
+    *,
+    method: str,
+    parameter: int,
+    repetition: int,
+    runtime_s: float,
+    evaluated: NDArray[np.float64],
+    mean_reference: NDArray[np.float64],
+    l1_reference: NDArray[np.float64],
+    reference_cell_volume: float,
+    means: NDArray[np.float64] | None = None,
+) -> SmoothingEvaluationRow:
+    if means is None:
+        means = _density_circular_means_1d(evaluated, reference_cell_volume)
+    mean_errors = _circular_abs_difference(means, mean_reference)
+    l1_errors = np.sum(np.abs(evaluated - l1_reference), axis=1) * reference_cell_volume
+    return SmoothingEvaluationRow(
+        method=method,
+        parameter=int(parameter),
+        repetition=int(repetition),
+        runtime_s=float(runtime_s),
+        mean_error_rad=float(np.mean(mean_errors)),
+        max_mean_error_rad=float(np.max(mean_errors)),
+        l1_error=float(np.mean(l1_errors)),
+        max_l1_error=float(np.max(l1_errors)),
+        min_evaluated_density=float(np.min(evaluated)),
+        max_normalization_error=_max_grid_normalization_error(evaluated, reference_cell_volume),
+    )
+
+
+def _density_circular_means_1d(values: NDArray[np.float64], cell_volume: float) -> NDArray[np.float64]:
+    grid_size = values.shape[1]
+    angles = np.linspace(0.0, 2.0 * np.pi, grid_size, endpoint=False)
+    moments = np.sum(values * np.exp(1j * angles)[None, :], axis=1) * cell_volume
+    return np.mod(np.angle(moments), 2.0 * np.pi)
+
+
+def _path_particle_smoother_summary_1d(
+    likelihoods: NDArray[np.float64],
+    noise_concentration: float,
+    n_particles: int,
+    *,
+    density_grid_size: int | None,
+    seed: int,
+    chunk_size: int,
+) -> dict[str, NDArray[np.float64]]:
+    rng = np.random.default_rng(seed)
+    time_steps = likelihoods.shape[0]
+    n_remaining = int(n_particles)
+    log_weight_offset = -np.inf
+    total_weight = 0.0
+    moments = np.zeros(time_steps, dtype=np.complex128)
+    histogram = None if density_grid_size is None else np.zeros((time_steps, int(density_grid_size)), dtype=float)
+
+    while n_remaining > 0:
+        current_chunk_size = min(int(chunk_size), n_remaining)
+        paths = _sample_torus_paths_1d(current_chunk_size, time_steps, noise_concentration, rng)
+        log_weights = _path_log_likelihoods_1d(paths, likelihoods)
+        chunk_max = float(np.max(log_weights))
+        new_offset = max(log_weight_offset, chunk_max)
+        if np.isneginf(new_offset):
+            scale_old = 0.0
+        else:
+            scale_old = 0.0 if np.isneginf(log_weight_offset) else float(np.exp(log_weight_offset - new_offset))
+        scaled_weights = np.exp(log_weights - new_offset)
+
+        total_weight = total_weight * scale_old + float(np.sum(scaled_weights))
+        moments = moments * scale_old + np.sum(scaled_weights[:, None] * np.exp(1j * paths), axis=0)
+        if histogram is not None:
+            histogram *= scale_old
+            indices = np.floor(paths * density_grid_size / (2.0 * np.pi)).astype(int) % density_grid_size
+            for t in range(time_steps):
+                histogram[t] += np.bincount(indices[:, t], weights=scaled_weights, minlength=density_grid_size)
+
+        log_weight_offset = new_offset
+        n_remaining -= current_chunk_size
+
+    means = np.mod(np.angle(moments / total_weight), 2.0 * np.pi)
+    result: dict[str, NDArray[np.float64]] = {"means": means}
+    if histogram is not None:
+        cell_volume = cell_volume_for_grid((int(density_grid_size),))
+        density = histogram / (total_weight * cell_volume)
+        result["density"] = density
+    return result
+
+
+def _sample_torus_paths_1d(
+    n_particles: int,
+    time_steps: int,
+    noise_concentration: float,
+    rng: np.random.Generator,
+) -> NDArray[np.float64]:
+    paths = np.empty((n_particles, time_steps), dtype=float)
+    paths[:, 0] = rng.uniform(0.0, 2.0 * np.pi, size=n_particles)
+    if time_steps > 1:
+        innovations = rng.vonmises(0.0, noise_concentration, size=(n_particles, time_steps - 1))
+        paths[:, 1:] = np.mod(paths[:, [0]] + np.cumsum(innovations, axis=1), 2.0 * np.pi)
+    return paths
+
+
+def _path_log_likelihoods_1d(
+    paths: NDArray[np.float64],
+    likelihoods: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    log_weights = np.zeros(paths.shape[0], dtype=float)
+    for t, likelihood in enumerate(likelihoods):
+        values = _periodic_linear_interpolate_1d(likelihood, paths[:, t])
+        log_weights += np.log(np.maximum(values, np.finfo(float).tiny))
+    return log_weights
+
+
+def _periodic_linear_interpolate_1d(values: NDArray[np.float64], angles: NDArray[np.float64]) -> NDArray[np.float64]:
+    positions = np.mod(angles, 2.0 * np.pi) * values.size / (2.0 * np.pi)
+    left = np.floor(positions).astype(int) % values.size
+    right = (left + 1) % values.size
+    fraction = positions - np.floor(positions)
+    return (1.0 - fraction) * values[left] + fraction * values[right]
+
+
+def _circular_abs_difference(left, right) -> NDArray[np.float64]:
+    difference = np.mod(np.asarray(left) - np.asarray(right) + np.pi, 2.0 * np.pi) - np.pi
+    return np.abs(difference)
+
+
+def _positive_int_tuple(values: Iterable[int], name: str) -> tuple[int, ...]:
+    result = tuple(int(value) for value in values)
+    if not result or any(value <= 0 for value in result):
+        raise ValueError(f"{name} must contain positive integers.")
+    return result
+
+
+def _von_mises_density_1d(angle: NDArray[np.float64], concentration: float) -> NDArray[np.float64]:
+    return np.exp(concentration * np.cos(angle)) / (2.0 * np.pi * np.i0(concentration))

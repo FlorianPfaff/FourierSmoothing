@@ -75,6 +75,72 @@ class TorusAdditiveGridTransition:
         raise ValueError(f"noise shape {noise.shape} is incompatible with grid shape {grid_shape}")
 
 
+@dataclass(frozen=True)
+class DenseGridTransition:
+    """Dense transition-density matrix for grid or histogram smoothers.
+
+    ``transition_density[i, j]`` is interpreted as
+    ``p(x_{t+1}=x_i | x_t=x_j)`` evaluated or averaged on the grid. The
+    backward prediction computes ``sum_i omega_i K[i, j] message[i]``.
+    """
+
+    transition_density: NDArray[np.float64]
+    grid_shape: tuple[int, ...]
+    cell_volume: float
+    normalize_columns: bool = True
+
+    @classmethod
+    def for_grid_shape(
+        cls,
+        transition_density: ArrayLike,
+        grid_shape: Iterable[int],
+        *,
+        cell_volume: float | None = None,
+        normalize_columns: bool = True,
+    ) -> "DenseGridTransition":
+        shape = _shape_tuple(grid_shape)
+        matrix = _as_real(transition_density, "transition_density")
+        n_grid = int(np.prod(shape))
+        if matrix.shape not in ((n_grid, n_grid),) and not (
+            matrix.ndim == 3 and matrix.shape[1:] == (n_grid, n_grid)
+        ):
+            raise ValueError(
+                f"transition density shape {matrix.shape} is incompatible with flattened grid size {n_grid}"
+            )
+        if cell_volume is None:
+            cell_volume = cell_volume_for_grid(shape)
+        return cls(matrix, shape, float(cell_volume), normalize_columns=normalize_columns)
+
+    def __call__(self, next_message: ArrayLike, t: int) -> NDArray[np.float64]:
+        message = _as_real(next_message, "next_message")
+        if message.shape != self.grid_shape:
+            raise ValueError(f"next_message shape {message.shape} does not match grid shape {self.grid_shape}")
+        matrix = self._matrix_at(t)
+        values = self.cell_volume * matrix.T @ message.reshape(-1)
+        return np.maximum(values.reshape(self.grid_shape), 0.0)
+
+    def forward_predict(self, current_density: ArrayLike, t: int) -> NDArray[np.float64]:
+        """Apply the forward transition to grid density values."""
+
+        density = _as_real(current_density, "current_density")
+        if density.shape != self.grid_shape:
+            raise ValueError(f"current_density shape {density.shape} does not match grid shape {self.grid_shape}")
+        matrix = self._matrix_at(t)
+        values = self.cell_volume * matrix @ density.reshape(-1)
+        return np.maximum(values.reshape(self.grid_shape), 0.0)
+
+    def _matrix_at(self, t: int) -> NDArray[np.float64]:
+        matrix = self.transition_density
+        if matrix.ndim == 3:
+            matrix = matrix[t]
+        if self.normalize_columns:
+            column_integrals = np.sum(matrix, axis=0, keepdims=True) * self.cell_volume
+            if not np.all(np.isfinite(column_integrals)) or np.any(column_integrals <= 0.0):
+                raise ValueError("transition-density columns must have positive finite integrals")
+            matrix = matrix / column_integrals
+        return matrix
+
+
 def torus_grid(grid_shape: Iterable[int]) -> tuple[NDArray[np.float64], ...]:
     """Return a broadcastable equidistant grid on [0, 2*pi)^d."""
 

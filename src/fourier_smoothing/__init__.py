@@ -2,15 +2,23 @@
 
 from .experiments import (
     BenchmarkRow,
+    FIGFPWCBenchmarkRow,
     NegativityDiagnosticRow,
+    SmoothingEvaluationRow,
     filtered_from_likelihoods,
+    make_pwc_additive_transition_kernel_1d,
+    make_pwc_additive_transition_density_matrix_1d,
     make_identity_likelihoods,
     make_sharp_multimodal_likelihoods,
     make_von_mises_like_noise,
+    run_figf_pwc_benchmark,
     run_identity_torus_benchmark,
+    run_smoothing_evaluation,
     run_truncation_negativity_diagnostic,
     write_benchmark_csv,
+    write_figf_pwc_csv,
     write_negativity_csv,
+    write_smoothing_evaluation_csv,
 )
 from .particle import (
     ParticleFilterResult,
@@ -30,6 +38,7 @@ from .particle_experiments import (
     write_particle_baseline_csv,
 )
 from .smoother import (
+    DenseGridTransition,
     FourierSmoothingResult,
     GridSmoothingResult,
     TorusAdditiveGridTransition,
@@ -51,12 +60,15 @@ from .smoother import (
 
 __all__ = [
     "BenchmarkRow",
+    "DenseGridTransition",
+    "FIGFPWCBenchmarkRow",
     "FourierSmoothingResult",
     "GridSmoothingResult",
     "NegativityDiagnosticRow",
     "ParticleBaselineRow",
     "ParticleFilterResult",
     "ParticleSmoothingResult",
+    "SmoothingEvaluationRow",
     "TorusAdditiveGridTransition",
     "bootstrap_particle_filter_1d",
     "cell_volume_for_grid",
@@ -68,6 +80,8 @@ __all__ = [
     "fourier_to_grid",
     "grid_backward_information_smoother",
     "grid_to_fourier",
+    "make_pwc_additive_transition_kernel_1d",
+    "make_pwc_additive_transition_density_matrix_1d",
     "make_identity_likelihoods",
     "make_sharp_multimodal_likelihoods",
     "make_von_mises_like_noise",
@@ -78,8 +92,10 @@ __all__ = [
     "periodic_linear_interpolate_1d",
     "resize_fourier_coefficients",
     "reverse_frequencies",
+    "run_figf_pwc_benchmark",
     "run_identity_torus_benchmark",
     "run_particle_baseline_benchmark",
+    "run_smoothing_evaluation",
     "run_truncation_negativity_diagnostic",
     "sample_from_grid_density_1d",
     "systematic_resample",
@@ -88,6 +104,8 @@ __all__ = [
     "transition_density_from_noise_1d",
     "truncate_fourier_coefficients",
     "write_benchmark_csv",
+    "write_figf_pwc_csv",
     "write_negativity_csv",
     "write_particle_baseline_csv",
+    "write_smoothing_evaluation_csv",
 ]

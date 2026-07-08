@@ -19,13 +19,14 @@ p(x_t\mid z_{1:T}) \propto p(x_t\mid z_{1:t})\,\beta_t(x_t).
 It includes:
 
 - a generic grid-based backward-information smoother,
+- a dense transition-matrix path for histogram/PWC forward-backward smoothing,
 - a periodic-grid transition for the additive identity model on `T^d`,
 - FFT helpers for complex Fourier coefficients in NumPy order,
 - aliasing-free Fourier multiplication by linear coefficient convolution and truncation,
 - dense-grid evaluation of truncated Fourier coefficient tensors,
 - a first Fourier identity smoother for additive torus dynamics,
-- a one-dimensional torus bootstrap particle-filter / FFBSi particle-smoother baseline,
-- reproducible benchmark, particle-baseline, and truncation-negativity diagnostic writers for paper result CSVs,
+- a one-dimensional torus bootstrap particle-filter / FFBSi particle-smoother diagnostic baseline,
+- reproducible FIGF/PWC benchmark, particle-baseline, and truncation-negativity diagnostic writers for paper result CSVs,
 - plotting scripts that write figures to the paper repository,
 - tests for identity, diffusive transition, aliasing, particle-baseline, and truncation-diagnostic cases.
 
@@ -52,19 +53,20 @@ pytest
 Run experiment code from this repository, but write generated outputs to the paper repository:
 
 ```bash
-python scripts/run_identity_torus_experiment.py --output-dir ../2026-07-FourierSmoothing-Paper/results --grid-sizes 15 31 63 127 --repetitions 5
-
-python scripts/run_truncation_negativity_diagnostic.py --output-dir ../2026-07-FourierSmoothing-Paper/results --k-max-values 1 2 3 5 8 12 16 --sharpness-values 2 5 9 13
-
-python scripts/run_particle_baseline_experiment.py --output-dir ../2026-07-FourierSmoothing-Paper/results --n-particles-values 100 300 1000 --n-trajectories 200 --repetitions 5
+ssh gpuserver6000
+cd /path/to/FourierSmoothing
+export PYTHONPATH=$PWD/src:/path/to/PyRecEst/src
+python scripts/run_smoothing_evaluation.py --output-dir ../2026-07-FourierSmoothing-Paper/results
 ```
 
-The identity benchmark writes `identity_torus_benchmark.csv`. The truncation diagnostic writes `truncation_negativity_diagnostic.csv`. The particle baseline writes `particle_smoother_baseline.csv`.
+The main paper benchmark writes `smoothing_evaluation_raw.csv` and `smoothing_evaluation_summary.csv`. It compares FIGFAN, FIGFDN, PWC, and PF by mean error, L1 density error, runtime, and error over runtime. The mean reference is a path-space PF smoother with 100,000 particles by default; the L1 reference is a high-resolution PWC smoother. Runtime values used in the paper should be measured on `gpuserver6000` while the server is idle.
 
-The default Fourier multiplication mode is `truncated_convolution`, which performs an aliasing-free coefficient convolution followed by truncation. To reproduce same-grid multiplication exactly in the identity benchmark, add:
+Additional diagnostics are still available:
 
 ```bash
---fourier-multiplication grid
+python scripts/run_identity_torus_experiment.py --output-dir ../2026-07-FourierSmoothing-Paper/results
+python scripts/run_truncation_negativity_diagnostic.py --output-dir ../2026-07-FourierSmoothing-Paper/results
+python scripts/run_particle_baseline_experiment.py --output-dir ../2026-07-FourierSmoothing-Paper/results
 ```
 
 ## Generate paper figures
@@ -73,6 +75,7 @@ After generating CSV results, create figures in the paper repository via:
 
 ```bash
 python scripts/plot_paper_results.py --results-dir ../2026-07-FourierSmoothing-Paper/results --figures-dir ../2026-07-FourierSmoothing-Paper/figures
+python scripts/plot_smoothing_hero.py --figures-dir ../2026-07-FourierSmoothing-Paper/figures
 ```
 
 ## Minimal example

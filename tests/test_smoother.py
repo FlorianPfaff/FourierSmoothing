@@ -1,6 +1,7 @@
 import numpy as np
 
 from fourier_smoothing import (
+    DenseGridTransition,
     TorusAdditiveGridTransition,
     cell_volume_for_grid,
     fourier_identity_smoother,
@@ -160,6 +161,25 @@ def test_two_dimensional_grid_backward_prediction_matches_brute_force_reference(
         rtol=1e-12,
         atol=1e-12,
     )
+
+
+def test_dense_grid_transition_uses_adjoint_matrix_for_backward_prediction():
+    grid_shape = (3,)
+    cell_volume = cell_volume_for_grid(grid_shape)
+    matrix = np.array(
+        [
+            [0.7, 0.2, 0.1],
+            [0.2, 0.6, 0.3],
+            [0.1, 0.2, 0.6],
+        ],
+        dtype=float,
+    )
+    matrix = matrix / (np.sum(matrix, axis=0, keepdims=True) * cell_volume)
+    message = np.array([1.0, 2.0, 3.0])
+    transition = DenseGridTransition.for_grid_shape(matrix, grid_shape, cell_volume=cell_volume)
+
+    np.testing.assert_allclose(transition(message, 0), cell_volume * matrix.T @ message)
+    np.testing.assert_allclose(transition.forward_predict(message, 0), cell_volume * matrix @ message)
 
 
 def test_multiply_fourier_truncated_avoids_same_grid_aliasing():

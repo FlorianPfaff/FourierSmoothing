@@ -6,11 +6,17 @@ from fourier_smoothing import (
     cell_volume_for_grid,
     filtered_from_likelihoods,
     make_identity_likelihoods,
+    make_pwc_additive_transition_density_matrix_1d,
+    make_pwc_additive_transition_kernel_1d,
     make_sharp_multimodal_likelihoods,
     run_identity_torus_benchmark,
+    run_figf_pwc_benchmark,
+    run_smoothing_evaluation,
     run_truncation_negativity_diagnostic,
     write_benchmark_csv,
+    write_figf_pwc_csv,
     write_negativity_csv,
+    write_smoothing_evaluation_csv,
 )
 
 
@@ -54,6 +60,69 @@ def test_identity_torus_benchmark_default_uses_truncated_convolution():
     rows = run_identity_torus_benchmark([9], repetitions=1, time_steps=3)
     assert {row.method for row in rows} == {"grid", "fourier_identity_truncated_convolution"}
     assert max(row.max_normalization_error for row in rows) < 1e-10
+
+
+def test_figf_pwc_benchmark_writes_csv(tmp_path):
+    rows = run_figf_pwc_benchmark(
+        [9],
+        repetitions=1,
+        time_steps=3,
+        reference_grid_size=65,
+        pwc_quadrature_points=3,
+    )
+    assert len(rows) == 3
+    assert {row.method for row in rows} == {"FIGFAN", "FIGFDN", "PWC"}
+    assert all(row.mean_l1_error_to_reference >= 0.0 for row in rows)
+    assert all(row.max_l1_error_to_reference >= 0.0 for row in rows)
+    assert all(np.isfinite(row.min_evaluated_density) for row in rows)
+    assert all(row.max_normalization_error < 1e-8 for row in rows)
+
+    output_path = write_figf_pwc_csv(rows, tmp_path / "figf_pwc_benchmark.csv")
+    with output_path.open(newline="", encoding="utf-8") as handle:
+        loaded_rows = list(csv.DictReader(handle))
+    assert len(loaded_rows) == len(rows)
+    assert loaded_rows[0]["method"] in {"FIGFAN", "FIGFDN", "PWC"}
+
+
+def test_pwc_transition_matrix_columns_are_normalized():
+    grid_size = 11
+    cell_volume = cell_volume_for_grid((grid_size,))
+    transition = make_pwc_additive_transition_density_matrix_1d(grid_size, 3.0, quadrature_points=3)
+    np.testing.assert_allclose(np.sum(transition, axis=0) * cell_volume, np.ones(grid_size), rtol=1e-12, atol=1e-12)
+
+
+def test_pwc_transition_kernel_is_normalized():
+    grid_size = 11
+    cell_volume = cell_volume_for_grid((grid_size,))
+    kernel = make_pwc_additive_transition_kernel_1d(grid_size, 3.0, quadrature_points=3)
+    np.testing.assert_allclose(np.sum(kernel) * cell_volume, 1.0, rtol=1e-12, atol=1e-12)
+
+
+def test_smoothing_evaluation_writes_csv(tmp_path):
+    rows = run_smoothing_evaluation(
+        figf_grid_sizes=[9],
+        pwc_grid_sizes=[9],
+        pf_particle_counts=[30],
+        repetitions=1,
+        time_steps=3,
+        l1_reference_grid_size=65,
+        mean_reference_particles=200,
+        particle_chunk_size=50,
+        pwc_quadrature_points=3,
+        seed=7,
+    )
+    assert len(rows) == 4
+    assert {row.method for row in rows} == {"FIGFAN", "FIGFDN", "PWC", "PF"}
+    assert all(row.runtime_s >= 0.0 for row in rows)
+    assert all(row.mean_error_rad >= 0.0 for row in rows)
+    assert all(row.l1_error >= 0.0 for row in rows)
+    assert all(row.max_normalization_error < 1e-8 for row in rows)
+
+    output_path = write_smoothing_evaluation_csv(rows, tmp_path / "smoothing_evaluation_raw.csv")
+    with output_path.open(newline="", encoding="utf-8") as handle:
+        loaded_rows = list(csv.DictReader(handle))
+    assert len(loaded_rows) == len(rows)
+    assert loaded_rows[0]["method"] in {"FIGFAN", "FIGFDN", "PWC", "PF"}
 
 
 def test_truncation_negativity_diagnostic_writes_csv(tmp_path):
