@@ -1,0 +1,1 @@
+Trigger hosted CI after switching artifact paths to non-hidden directories.
