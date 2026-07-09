@@ -27,7 +27,7 @@ It includes:
 - a first Fourier identity smoother for additive torus dynamics,
 - a one-dimensional torus bootstrap particle-filter / FFBSi particle-smoother diagnostic baseline,
 - reproducible FIGF/PWC benchmark, particle-baseline, and truncation-negativity diagnostic writers for paper result CSVs,
-- plotting scripts that write figures to the paper repository,
+- plotting and LaTeX-table scripts that write figures/tables to the paper repository,
 - tests for identity, diffusive transition, aliasing, particle-baseline, and truncation-diagnostic cases.
 
 ## Install
@@ -47,6 +47,26 @@ python -m pip install -e .[paper]
 ```bash
 pytest
 ```
+
+## One-command paper artifact pipeline
+
+For a smoke run that generates CSVs, figures, and LaTeX tables in a local artifact directory:
+
+```bash
+python scripts/run_paper_artifact_pipeline.py --profile smoke --output-root generated_paper_artifacts
+```
+
+For a paper-scale diagnostic run, use:
+
+```bash
+python scripts/run_paper_artifact_pipeline.py \
+  --profile paper \
+  --results-dir ../2026-07-FourierSmoothing-Paper/results \
+  --figures-dir ../2026-07-FourierSmoothing-Paper/figures \
+  --tables-dir ../2026-07-FourierSmoothing-Paper/tex/tables
+```
+
+The GitHub Actions workflow `Paper artifacts` runs the same pipeline and uploads generated CSV, figure, and table artifacts.
 
 ## Generate paper results
 
@@ -69,12 +89,13 @@ python scripts/run_truncation_negativity_diagnostic.py --output-dir ../2026-07-F
 python scripts/run_particle_baseline_experiment.py --output-dir ../2026-07-FourierSmoothing-Paper/results
 ```
 
-## Generate paper figures
+## Generate paper figures and tables
 
-After generating CSV results, create figures in the paper repository via:
+After generating CSV results, create figures and tables in the paper repository via:
 
 ```bash
 python scripts/plot_paper_results.py --results-dir ../2026-07-FourierSmoothing-Paper/results --figures-dir ../2026-07-FourierSmoothing-Paper/figures
+python scripts/write_latex_tables.py --results-dir ../2026-07-FourierSmoothing-Paper/results --tables-dir ../2026-07-FourierSmoothing-Paper/tex/tables
 python scripts/plot_smoothing_hero.py --figures-dir ../2026-07-FourierSmoothing-Paper/figures
 ```
 
