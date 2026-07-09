@@ -1,0 +1,1 @@
+Trigger hosted CI for the paper artifact pipeline workflow.
