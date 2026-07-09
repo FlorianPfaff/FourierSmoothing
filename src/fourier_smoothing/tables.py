@@ -6,7 +6,7 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean
-from typing import Iterable, Mapping, Sequence
+from typing import Mapping, Sequence
 
 
 TABLE_FILENAMES = {
@@ -183,10 +183,10 @@ def _tabular(*, columns: str, header: Sequence[str], rows: Sequence[Sequence[str
         f"% {caption_comment}",
         f"\\begin{{tabular}}{{{columns}}}",
         "\\toprule",
-        " & ".join(header) + " \\\",
+        " & ".join(header) + r" \\",
         "\\midrule",
     ]
-    lines.extend(" & ".join(row) + " \\\" for row in rows)
+    lines.extend(" & ".join(row) + r" \\" for row in rows)
     lines.extend(["\\bottomrule", "\\end{tabular}", ""])
     return "\n".join(lines)
 
