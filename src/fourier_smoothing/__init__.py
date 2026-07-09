@@ -57,6 +57,7 @@ from .smoother import (
     torus_identity_backward_predict_fourier,
     truncate_fourier_coefficients,
 )
+from .tables import TABLE_FILENAMES, write_latex_tables
 
 __all__ = [
     "BenchmarkRow",
@@ -69,6 +70,7 @@ __all__ = [
     "ParticleFilterResult",
     "ParticleSmoothingResult",
     "SmoothingEvaluationRow",
+    "TABLE_FILENAMES",
     "TorusAdditiveGridTransition",
     "bootstrap_particle_filter_1d",
     "cell_volume_for_grid",
@@ -105,6 +107,7 @@ __all__ = [
     "truncate_fourier_coefficients",
     "write_benchmark_csv",
     "write_figf_pwc_csv",
+    "write_latex_tables",
     "write_negativity_csv",
     "write_particle_baseline_csv",
     "write_smoothing_evaluation_csv",
