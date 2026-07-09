@@ -1,0 +1,47 @@
+name: Paper artifacts
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Artifact generation profile
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - paper
+
+jobs:
+  generate:
+    name: Generate paper artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PROFILE: ${{ github.event.inputs.profile || 'smoke' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install package with paper extra
+        run: |
+          python -m pip install -q --upgrade pip
+          python -m pip install -q -e '.[paper]'
+
+      - name: Generate paper artifacts
+        run: |
+          python scripts/run_paper_artifact_pipeline.py --profile "${PROFILE}" --output-root generated_paper_artifacts
+
+      - name: Upload generated paper artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fourier-smoothing-paper-artifacts-${{ env.PROFILE }}
+          path: generated_paper_artifacts/**
+          if-no-files-found: error
