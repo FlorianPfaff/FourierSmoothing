@@ -1,1 +1,1 @@
-Trigger final hosted CI for pairwise marginals, FFT-based EM increment statistics, the additive-noise M-step, multidimensional tests, and the complete paper artifact pipeline.
+Trigger final hosted CI for pairwise marginals, FFT-based EM increment statistics, the additive-noise M-step, dense general-transition adjoints, multidimensional tests, and the complete paper artifact pipeline.
