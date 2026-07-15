@@ -85,11 +85,45 @@ def test_write_latex_tables_from_known_result_csvs(tmp_path):
             }
         ],
     )
+    _write_csv(
+        results_dir / "smoothing_evaluation_summary.csv",
+        ["method", "parameter", "n_repetitions", "runtime_s_mean", "mean_error_rad_mean", "l1_error_mean"],
+        [
+            {
+                "method": "FIGFAN",
+                "parameter": "17",
+                "n_repetitions": "1",
+                "runtime_s_mean": "0.004",
+                "mean_error_rad_mean": "0.02",
+                "l1_error_mean": "0.05",
+            }
+        ],
+    )
+    # If both are present, the pre-aggregated summary must take precedence.
+    _write_csv(
+        results_dir / "smoothing_evaluation_raw.csv",
+        ["method", "parameter", "repetition", "runtime_s", "mean_error_rad", "l1_error"],
+        [
+            {
+                "method": "FIGFAN",
+                "parameter": "17",
+                "repetition": "0",
+                "runtime_s": "9.9",
+                "mean_error_rad": "9.9",
+                "l1_error": "9.9",
+            }
+        ],
+    )
 
     written = write_latex_tables(results_dir, tables_dir)
 
-    assert len(written) == 3
-    for filename in [TABLE_FILENAMES["identity"], TABLE_FILENAMES["negativity"], TABLE_FILENAMES["particle"]]:
+    assert len(written) == 4
+    for filename in [
+        TABLE_FILENAMES["identity"],
+        TABLE_FILENAMES["negativity"],
+        TABLE_FILENAMES["particle"],
+        TABLE_FILENAMES["smoothing"],
+    ]:
         content = (tables_dir / filename).read_text(encoding="utf-8")
         assert "\\begin{tabular}" in content
         assert "\\toprule" in content
@@ -97,3 +131,6 @@ def test_write_latex_tables_from_known_result_csvs(tmp_path):
     assert "fourier\\_identity\\_truncated\\_convolution" in (tables_dir / TABLE_FILENAMES["identity"]).read_text(
         encoding="utf-8"
     )
+    smoothing_content = (tables_dir / TABLE_FILENAMES["smoothing"]).read_text(encoding="utf-8")
+    assert "0.004" in smoothing_content
+    assert "9.9" not in smoothing_content
