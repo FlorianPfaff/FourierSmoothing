@@ -8,6 +8,7 @@ from fourier_smoothing import (
     normalize_grid_density,
     torus_grid,
 )
+from fourier_smoothing.em import average_increment_density, torus_increment_density_from_pairwise
 from fourier_smoothing.pairwise import (
     grid_pairwise_smoothed_marginals,
     pairwise_current_marginal,
@@ -122,3 +123,38 @@ def test_pairwise_supports_time_varying_transition_matrices():
     )
     assert result.joint.shape == (2, 7, 7)
     assert np.all(np.isfinite(result.joint))
+
+
+def test_pairwise_increment_density_recovers_additive_noise_without_measurements():
+    grid_shape = (11,)
+    (x,) = torus_grid(grid_shape)
+    cell_volume = cell_volume_for_grid(grid_shape)
+    likelihoods = np.ones((3, grid_shape[0]))
+
+    noise_a = normalize_grid_density(np.exp(1.2 * np.cos(x - 0.2)), cell_volume)
+    noise_b = normalize_grid_density(np.exp(2.1 * np.cos(x + 0.4)), cell_volume)
+    matrices = np.stack(
+        [
+            torus_additive_transition_density_matrix(noise_a, cell_volume=cell_volume),
+            torus_additive_transition_density_matrix(noise_b, cell_volume=cell_volume),
+        ],
+        axis=0,
+    )
+    transition = DenseGridTransition.for_grid_shape(matrices, grid_shape, cell_volume=cell_volume)
+    filtered = _forward_filter(likelihoods, transition, cell_volume)
+    smoothed = grid_backward_information_smoother(filtered, likelihoods, transition, cell_volume=cell_volume)
+    pairwise = grid_pairwise_smoothed_marginals(
+        filtered,
+        likelihoods,
+        smoothed.backward_messages,
+        matrices,
+        cell_volume=cell_volume,
+    )
+
+    increments = torus_increment_density_from_pairwise(pairwise.joint, grid_shape, cell_volume)
+    np.testing.assert_allclose(increments[0], noise_a, rtol=1e-11, atol=1e-12)
+    np.testing.assert_allclose(increments[1], noise_b, rtol=1e-11, atol=1e-12)
+
+    averaged = average_increment_density(increments, cell_volume)
+    expected_average = normalize_grid_density(0.5 * (noise_a + noise_b), cell_volume)
+    np.testing.assert_allclose(averaged, expected_average, rtol=1e-12, atol=1e-12)
