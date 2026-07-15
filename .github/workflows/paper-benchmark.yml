@@ -1,0 +1,75 @@
+name: Paper benchmark on gpuserver6000
+
+on:
+  workflow_dispatch:
+    inputs:
+      repetitions:
+        description: Number of benchmark repetitions
+        required: true
+        default: '5'
+        type: string
+      seed:
+        description: Random seed
+        required: true
+        default: '1'
+        type: string
+
+concurrency:
+  group: paper-benchmark-gpuserver6000
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    name: Final accuracy-runtime benchmark
+    runs-on: [self-hosted, Linux, X64, gpuserver6000]
+    timeout-minutes: 360
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Record benchmark environment
+        run: |
+          mkdir -p paper_benchmark/environment
+          date --iso-8601=seconds | tee paper_benchmark/environment/date.txt
+          hostname | tee paper_benchmark/environment/hostname.txt
+          uname -a | tee paper_benchmark/environment/uname.txt
+          uptime | tee paper_benchmark/environment/uptime.txt
+          nproc | tee paper_benchmark/environment/nproc.txt
+          lscpu | tee paper_benchmark/environment/lscpu.txt
+          free -h | tee paper_benchmark/environment/memory.txt
+          python --version | tee paper_benchmark/environment/python.txt
+          python -m pip freeze > paper_benchmark/environment/pip-freeze.txt
+
+      - name: Install benchmark package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[paper]'
+
+      - name: Run main paper benchmark
+        run: |
+          python scripts/run_smoothing_evaluation.py \
+            --output-dir paper_benchmark/results \
+            --repetitions '${{ inputs.repetitions }}' \
+            --seed '${{ inputs.seed }}'
+
+      - name: Generate benchmark figures and table
+        run: |
+          python scripts/plot_paper_results.py \
+            --results-dir paper_benchmark/results \
+            --figures-dir paper_benchmark/figures
+          python scripts/write_latex_tables.py \
+            --results-dir paper_benchmark/results \
+            --tables-dir paper_benchmark/tables
+
+      - name: Record output checksums
+        run: |
+          find paper_benchmark -type f -print0 | sort -z | xargs -0 sha256sum > paper_benchmark/SHA256SUMS
+
+      - name: Upload final benchmark bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: fourier-smoothing-gpuserver6000-benchmark
+          path: paper_benchmark/**
+          if-no-files-found: error
+          retention-days: 90
