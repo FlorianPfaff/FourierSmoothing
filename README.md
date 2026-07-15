@@ -20,6 +20,7 @@ It includes:
 
 - a generic grid-based backward-information smoother,
 - a dense transition-matrix path for histogram/PWC forward-backward smoothing,
+- pairwise two-time smoothed marginals for EM-style transition/noise estimation,
 - a periodic-grid transition for the additive identity model on `T^d`,
 - FFT helpers for complex Fourier coefficients in NumPy order,
 - aliasing-free Fourier multiplication by linear coefficient convolution and truncation,
@@ -28,7 +29,7 @@ It includes:
 - a one-dimensional torus bootstrap particle-filter / FFBSi particle-smoother diagnostic baseline,
 - reproducible FIGF/PWC benchmark, particle-baseline, and truncation-negativity diagnostic writers for paper result CSVs,
 - plotting and LaTeX-table scripts that write figures/tables to the paper repository,
-- tests for identity, diffusive transition, aliasing, particle-baseline, and truncation-diagnostic cases.
+- tests for identity, diffusive transition, pairwise marginals, aliasing, particle-baseline, and truncation-diagnostic cases.
 
 ## Install
 
@@ -56,6 +57,8 @@ For a smoke run that generates CSVs, figures, and LaTeX tables in a local artifa
 python scripts/run_paper_artifact_pipeline.py --profile smoke --output-root generated_paper_artifacts
 ```
 
+The smoke profile includes a compact FIGFAN/FIGFDN/PWC/PF evaluation so the complete result-to-figure-to-table path is exercised in CI.
+
 For a paper-scale diagnostic run, use:
 
 ```bash
@@ -66,7 +69,7 @@ python scripts/run_paper_artifact_pipeline.py \
   --tables-dir ../2026-07-FourierSmoothing-Paper/tex/tables
 ```
 
-The GitHub Actions workflow `Paper artifacts` runs the same pipeline and uploads generated CSV, figure, and table artifacts.
+The paper profile does not rerun the main timing evaluation by default, because its final runtimes should be measured on the designated server. Add `--include-smoothing-evaluation` to run it as part of the pipeline, or `--no-include-smoothing-evaluation` to skip it explicitly. The GitHub Actions workflow `Paper artifacts` runs the smoke pipeline and uploads generated CSV, figure, and table artifacts.
 
 ## Generate paper results
 
