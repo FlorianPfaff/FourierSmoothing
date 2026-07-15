@@ -151,6 +151,38 @@ def torus_increment_densities_from_smoother(
     return increments
 
 
+def additive_noise_density_m_step(
+    filtered: ArrayLike,
+    likelihoods: ArrayLike,
+    backward_messages: ArrayLike,
+    current_noise_density: ArrayLike,
+    *,
+    cell_volume: float | None = None,
+    normalize_noise: bool = True,
+) -> NDArray[np.float64]:
+    """Perform the nonparametric M-step for time-invariant additive torus noise.
+
+    This function computes every transition-increment posterior by FFT and
+    returns their normalized arithmetic mean. It is one M-step conditioned on
+    filtering and backward messages from the current model; a complete EM loop
+    must rerun filtering and smoothing after each update.
+    """
+
+    increments = torus_increment_densities_from_smoother(
+        filtered,
+        likelihoods,
+        backward_messages,
+        current_noise_density,
+        cell_volume=cell_volume,
+        normalize_noise=normalize_noise,
+    )
+    if increments.shape[0] == 0:
+        raise ValueError("at least two time steps are required for an additive-noise M-step")
+    grid_shape = tuple(int(value) for value in increments.shape[1:])
+    volume = cell_volume_for_grid(grid_shape) if cell_volume is None else _positive_volume(cell_volume)
+    return average_increment_density(increments, volume)
+
+
 def average_increment_density(increment_densities: ArrayLike, cell_volume: float) -> NDArray[np.float64]:
     """Average time-indexed increment densities and renormalize the result."""
 
