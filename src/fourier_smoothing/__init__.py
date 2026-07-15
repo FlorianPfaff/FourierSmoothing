@@ -27,6 +27,11 @@ from .experiments import (
     write_negativity_csv,
     write_smoothing_evaluation_csv,
 )
+from .general_transition import (
+    fourier_general_backward_predict,
+    fourier_general_forward_predict,
+    transition_grid_to_fourier,
+)
 from .pairwise import (
     GridPairwiseSmoothingResult,
     grid_pairwise_smoothed_marginals,
@@ -95,6 +100,8 @@ __all__ = [
     "circular_mean",
     "ffbsi_particle_smoother_1d",
     "filtered_from_likelihoods",
+    "fourier_general_backward_predict",
+    "fourier_general_forward_predict",
     "fourier_identity_smoother",
     "fourier_to_grid",
     "grid_backward_information_smoother",
@@ -128,6 +135,7 @@ __all__ = [
     "torus_increment_density_from_pairwise",
     "torus_identity_backward_predict_fourier",
     "transition_density_from_noise_1d",
+    "transition_grid_to_fourier",
     "truncate_fourier_coefficients",
     "write_benchmark_csv",
     "write_figf_pwc_csv",
