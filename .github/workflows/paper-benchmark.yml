@@ -39,12 +39,13 @@ jobs:
           lscpu | tee paper_benchmark/environment/lscpu.txt
           free -h | tee paper_benchmark/environment/memory.txt
           python --version | tee paper_benchmark/environment/python.txt
-          python -m pip freeze > paper_benchmark/environment/pip-freeze.txt
+          python -m pip freeze > paper_benchmark/environment/pip-freeze-before.txt
 
       - name: Install benchmark package
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e '.[paper]'
+          python -m pip freeze > paper_benchmark/environment/pip-freeze-after.txt
 
       - name: Run main paper benchmark
         run: |
@@ -64,7 +65,10 @@ jobs:
 
       - name: Record output checksums
         run: |
-          find paper_benchmark -type f -print0 | sort -z | xargs -0 sha256sum > paper_benchmark/SHA256SUMS
+          find paper_benchmark -type f ! -name SHA256SUMS -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            > paper_benchmark/SHA256SUMS
 
       - name: Upload final benchmark bundle
         uses: actions/upload-artifact@v4
