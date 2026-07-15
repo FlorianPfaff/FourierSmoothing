@@ -2,6 +2,7 @@ import numpy as np
 
 from fourier_smoothing import (
     DenseGridTransition,
+    additive_noise_density_m_step,
     average_increment_density,
     cell_volume_for_grid,
     grid_backward_information_smoother,
@@ -71,7 +72,7 @@ def test_fft_increment_density_matches_dense_pairwise_projection():
     np.testing.assert_allclose(np.sum(actual) * cell_volume, 1.0, rtol=1e-12, atol=1e-12)
 
 
-def test_message_increment_sequence_matches_pairwise_sequence():
+def test_message_increment_sequence_matches_pairwise_sequence_and_m_step():
     grid_shape = (13,)
     (x,) = torus_grid(grid_shape)
     cell_volume = cell_volume_for_grid(grid_shape)
@@ -106,6 +107,16 @@ def test_message_increment_sequence_matches_pairwise_sequence():
         cell_volume=cell_volume,
     )
     np.testing.assert_allclose(actual, expected, rtol=1e-11, atol=1e-12)
+
+    expected_m_step = average_increment_density(expected, cell_volume)
+    actual_m_step = additive_noise_density_m_step(
+        filtered,
+        likelihoods,
+        smoothed.backward_messages,
+        noise,
+        cell_volume=cell_volume,
+    )
+    np.testing.assert_allclose(actual_m_step, expected_m_step, rtol=1e-11, atol=1e-12)
 
 
 def test_average_increment_density_is_normalized():
