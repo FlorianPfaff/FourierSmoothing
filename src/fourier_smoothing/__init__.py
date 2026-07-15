@@ -30,6 +30,7 @@ from .experiments import (
 from .general_transition import (
     fourier_general_backward_predict,
     fourier_general_forward_predict,
+    fourier_general_transition_smoother,
     transition_grid_to_fourier,
 )
 from .pairwise import (
@@ -102,6 +103,7 @@ __all__ = [
     "filtered_from_likelihoods",
     "fourier_general_backward_predict",
     "fourier_general_forward_predict",
+    "fourier_general_transition_smoother",
     "fourier_identity_smoother",
     "fourier_to_grid",
     "grid_backward_information_smoother",
