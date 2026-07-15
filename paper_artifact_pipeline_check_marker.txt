@@ -1,1 +1,3 @@
 Trigger hosted CI for the paper artifact pipeline workflow.
+
+Retriggered after integrating the main smoothing evaluation and summary table generation.
