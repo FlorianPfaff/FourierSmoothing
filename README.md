@@ -21,7 +21,9 @@ It includes:
 - a generic grid-based backward-information smoother,
 - a dense transition-matrix path for histogram/PWC forward-backward smoothing,
 - pairwise two-time smoothed marginals for EM-style transition/noise estimation,
+- FFT-based additive-noise increment posteriors and a nonparametric M-step without materializing pairwise matrices,
 - a periodic-grid transition for the additive identity model on `T^d`,
+- dense general-transition forward and adjoint contractions in Fourier coefficients,
 - FFT helpers for complex Fourier coefficients in NumPy order,
 - aliasing-free Fourier multiplication by linear coefficient convolution and truncation,
 - dense-grid evaluation of truncated Fourier coefficient tensors,
@@ -29,7 +31,7 @@ It includes:
 - a one-dimensional torus bootstrap particle-filter / FFBSi particle-smoother diagnostic baseline,
 - reproducible FIGF/PWC benchmark, particle-baseline, and truncation-negativity diagnostic writers for paper result CSVs,
 - plotting and LaTeX-table scripts that write figures/tables to the paper repository,
-- tests for identity, diffusive transition, pairwise marginals, aliasing, particle-baseline, and truncation-diagnostic cases.
+- tests for identity and diffusive dynamics, general transitions, pairwise marginals, multidimensional EM statistics, aliasing, particle baselines, and truncation diagnostics.
 
 ## Install
 
@@ -141,4 +143,4 @@ smoothed = result.smoothed
 
 ## Scope
 
-This is deliberately a first implementation. The Fourier smoother now has both an aliasing-free truncated coefficient-convolution path and a grid-transform path. The grid-transform path remains useful for diagnostics and equivalence checks against grid smoothers.
+The efficient special case is additive torus dynamics, where forward and backward propagation reduce to FFT-based cyclic convolution/correlation. Dense grid and Fourier transition operators are also provided for general models; scalable sparse or low-rank general-transition representations remain future work. The coefficient-only identity smoother retains both aliasing-free truncated-convolution and same-grid diagnostic multiplication paths.
