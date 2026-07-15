@@ -1,6 +1,7 @@
 """Reference implementation of Fourier/grid fixed-interval smoothing."""
 
 from .em import (
+    additive_noise_density_m_step,
     average_increment_density,
     torus_increment_densities_from_smoother,
     torus_increment_density_from_messages,
@@ -86,6 +87,7 @@ __all__ = [
     "SmoothingEvaluationRow",
     "TABLE_FILENAMES",
     "TorusAdditiveGridTransition",
+    "additive_noise_density_m_step",
     "average_increment_density",
     "bootstrap_particle_filter_1d",
     "cell_volume_for_grid",
