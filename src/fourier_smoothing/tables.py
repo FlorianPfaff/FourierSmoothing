@@ -21,8 +21,9 @@ TABLE_FILENAMES = {
 def write_latex_tables(results_dir: str | Path, tables_dir: str | Path) -> list[Path]:
     """Write LaTeX summary tables for all known result CSVs in ``results_dir``.
 
-    Missing CSV files are skipped. The function returns the paths that were
-    written, which makes it convenient for CI checks and scripts.
+    Missing CSV files are skipped. For the main smoothing evaluation, the
+    pre-aggregated summary CSV is preferred over the raw repetitions. The
+    function returns the paths that were written.
     """
 
     results_path = Path(results_dir)
@@ -34,17 +35,22 @@ def write_latex_tables(results_dir: str | Path, tables_dir: str | Path) -> list[
         ("truncation_negativity_diagnostic.csv", tables_path / TABLE_FILENAMES["negativity"], _negativity_table),
         ("particle_smoother_baseline.csv", tables_path / TABLE_FILENAMES["particle"], _particle_table),
         ("figf_pwc_benchmark.csv", tables_path / TABLE_FILENAMES["figf_pwc"], _figf_pwc_table),
-        ("smoothing_evaluation.csv", tables_path / TABLE_FILENAMES["smoothing"], _smoothing_table),
+        ("smoothing_evaluation_summary.csv", tables_path / TABLE_FILENAMES["smoothing"], _smoothing_summary_table),
+        ("smoothing_evaluation_raw.csv", tables_path / TABLE_FILENAMES["smoothing"], _smoothing_raw_table),
     ]
 
     written: list[Path] = []
+    written_outputs: set[Path] = set()
     for csv_name, output_path, writer in writers:
+        if output_path in written_outputs:
+            continue
         csv_path = results_path / csv_name
         if csv_path.exists():
             rows = _read_csv(csv_path)
             if rows:
                 output_path.write_text(writer(rows), encoding="utf-8")
                 written.append(output_path)
+                written_outputs.add(output_path)
     return written
 
 
@@ -153,7 +159,27 @@ def _figf_pwc_table(rows: Sequence[Mapping[str, str]]) -> str:
     )
 
 
-def _smoothing_table(rows: Sequence[Mapping[str, str]]) -> str:
+def _smoothing_summary_table(rows: Sequence[Mapping[str, str]]) -> str:
+    body = []
+    for row in sorted(rows, key=lambda item: (item["method"], int(item["parameter"]))):
+        body.append(
+            [
+                _latex_escape(row["method"]),
+                str(int(row["parameter"])),
+                _fmt(float(row["runtime_s_mean"])),
+                _fmt(float(row["mean_error_rad_mean"])),
+                _fmt(float(row["l1_error_mean"])),
+            ]
+        )
+    return _tabular(
+        columns="lrrrr",
+        header=["method", "parameter", "runtime [s]", "mean err. [rad]", "$L^1$ err."],
+        rows=body,
+        caption_comment="Main smoothing evaluation summary.",
+    )
+
+
+def _smoothing_raw_table(rows: Sequence[Mapping[str, str]]) -> str:
     grouped: dict[tuple[str, int], list[Mapping[str, str]]] = defaultdict(list)
     for row in rows:
         grouped[(row["method"], int(row["parameter"]))].append(row)
@@ -174,7 +200,7 @@ def _smoothing_table(rows: Sequence[Mapping[str, str]]) -> str:
         columns="lrrrr",
         header=["method", "parameter", "runtime [s]", "mean err. [rad]", "$L^1$ err."],
         rows=body,
-        caption_comment="Smoothing evaluation summary.",
+        caption_comment="Main smoothing evaluation summary generated from raw repetitions.",
     )
 
 
