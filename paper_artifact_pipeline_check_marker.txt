@@ -1,3 +1,3 @@
 Trigger hosted CI for the paper artifact pipeline workflow.
 
-Retriggered after integrating the main smoothing evaluation, summary tables, pairwise smoothed marginals, EM increment-density helpers, and concurrency controls.
+Retriggered after integrating the main smoothing evaluation, summary tables, pairwise smoothed marginals, multidimensional EM increment-density tests, and concurrency controls.
