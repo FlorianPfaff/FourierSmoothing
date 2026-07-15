@@ -1,5 +1,6 @@
 """Reference implementation of Fourier/grid fixed-interval smoothing."""
 
+from .em import average_increment_density, torus_increment_density_from_pairwise
 from .experiments import (
     BenchmarkRow,
     FIGFPWCBenchmarkRow,
@@ -80,6 +81,7 @@ __all__ = [
     "SmoothingEvaluationRow",
     "TABLE_FILENAMES",
     "TorusAdditiveGridTransition",
+    "average_increment_density",
     "bootstrap_particle_filter_1d",
     "cell_volume_for_grid",
     "circular_abs_difference",
@@ -114,6 +116,7 @@ __all__ = [
     "systematic_resample",
     "torus_additive_transition_density_matrix",
     "torus_grid",
+    "torus_increment_density_from_pairwise",
     "torus_identity_backward_predict_fourier",
     "transition_density_from_noise_1d",
     "truncate_fourier_coefficients",
