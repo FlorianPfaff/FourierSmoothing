@@ -20,6 +20,13 @@ from .experiments import (
     write_negativity_csv,
     write_smoothing_evaluation_csv,
 )
+from .pairwise import (
+    GridPairwiseSmoothingResult,
+    grid_pairwise_smoothed_marginals,
+    pairwise_current_marginal,
+    pairwise_next_marginal,
+    torus_additive_transition_density_matrix,
+)
 from .particle import (
     ParticleFilterResult,
     ParticleSmoothingResult,
@@ -64,6 +71,7 @@ __all__ = [
     "DenseGridTransition",
     "FIGFPWCBenchmarkRow",
     "FourierSmoothingResult",
+    "GridPairwiseSmoothingResult",
     "GridSmoothingResult",
     "NegativityDiagnosticRow",
     "ParticleBaselineRow",
@@ -81,6 +89,7 @@ __all__ = [
     "fourier_identity_smoother",
     "fourier_to_grid",
     "grid_backward_information_smoother",
+    "grid_pairwise_smoothed_marginals",
     "grid_to_fourier",
     "make_pwc_additive_transition_kernel_1d",
     "make_pwc_additive_transition_density_matrix_1d",
@@ -91,6 +100,8 @@ __all__ = [
     "multiply_fourier_via_grid",
     "normalize_fourier_density",
     "normalize_grid_density",
+    "pairwise_current_marginal",
+    "pairwise_next_marginal",
     "periodic_linear_interpolate_1d",
     "resize_fourier_coefficients",
     "reverse_frequencies",
@@ -101,6 +112,7 @@ __all__ = [
     "run_truncation_negativity_diagnostic",
     "sample_from_grid_density_1d",
     "systematic_resample",
+    "torus_additive_transition_density_matrix",
     "torus_grid",
     "torus_identity_backward_predict_fourier",
     "transition_density_from_noise_1d",
