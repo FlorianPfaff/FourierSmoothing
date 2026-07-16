@@ -13,7 +13,7 @@ The current implementation focuses on the backward-information smoother
 with the smoothed density
 
 ```math
-p(x_t\mid z_{1:T}) \propto p(x_t\mid z_{1:t})\,\beta_t(x_t).
+p(x_t\mid z_{0:T}) \propto p(x_t\mid z_{0:t})\,\beta_t(x_t).
 ```
 
 It includes:
@@ -131,16 +131,16 @@ likelihoods = np.stack([
     1.0 + 0.2 * np.sin(2.0 * x),
 ])
 
-filtered = []
-cumulative = np.ones_like(x)
-for likelihood in likelihoods:
-    cumulative *= likelihood
-    filtered.append(normalize_grid_density(cumulative, cell_volume))
-filtered = np.stack(filtered)
-
 noise = np.exp(3.0 * np.cos(x))
 noise = normalize_grid_density(noise, cell_volume)
 transition = TorusAdditiveGridTransition.for_grid_shape(noise, grid_shape)
+
+filtered = [normalize_grid_density(likelihoods[0], cell_volume)]
+for likelihood in likelihoods[1:]:
+    predicted = np.fft.ifft(np.fft.fft(noise) * np.fft.fft(filtered[-1])).real
+    predicted *= cell_volume
+    filtered.append(normalize_grid_density(predicted * likelihood, cell_volume))
+filtered = np.stack(filtered)
 
 result = grid_backward_information_smoother(filtered, likelihoods, transition)
 smoothed = result.smoothed
