@@ -68,7 +68,7 @@ python scripts/run_paper_artifact_pipeline.py \
   --profile paper \
   --results-dir ../2026-07-FourierSmoothing-Paper/results \
   --figures-dir ../2026-07-FourierSmoothing-Paper/figures \
-  --tables-dir ../2026-07-FourierSmoothing-Paper/tex/tables
+  --tables-dir ../2026-07-FourierSmoothing-Paper/tables
 ```
 
 The paper profile does not rerun the main timing evaluation by default, because its final runtimes should be measured on the designated server. Add `--include-smoothing-evaluation` to run it as part of the pipeline, or `--no-include-smoothing-evaluation` to skip it explicitly. The GitHub Actions workflow `Paper artifacts` runs the smoke pipeline and uploads generated CSV, figure, and table artifacts.
@@ -82,9 +82,14 @@ ssh gpuserver6000
 cd /path/to/FourierSmoothing
 export PYTHONPATH=$PWD/src:/path/to/PyRecEst/src
 python scripts/run_smoothing_evaluation.py --output-dir ../2026-07-FourierSmoothing-Paper/results
+python scripts/run_smoothing_error_reduction.py --output-dir ../2026-07-FourierSmoothing-Paper/results
 ```
 
-The main paper benchmark writes `smoothing_evaluation_raw.csv` and `smoothing_evaluation_summary.csv`. It compares FIGFAN, FIGFDN, PWC, and PF by mean error, L1 density error, runtime, and error over runtime. The mean reference is a path-space PF smoother with 100,000 particles by default; the L1 reference is a high-resolution PWC smoother. Runtime values used in the paper should be measured on `gpuserver6000` while the server is idle.
+The main benchmark writes `smoothing_evaluation_raw.csv`, `smoothing_evaluation_summary.csv`, and `smoothing_evaluation_metadata.json`. It compares FIGFAN, FIGFDN, PWC, and a bootstrap-PF/FFBSi smoother by mean-direction error, $L^1$ density error, runtime, and error over runtime over 30 repetitions. The mean reference aggregates three independent FFBSi runs with one million particles and trajectories each. The density reference is a PWC smoother with 65,535 cells. Particle marginals are converted to continuous densities with a wrapped-normal KDE using bandwidth $N^{-1/5}$. The summary uses `pyrecest.evaluation.summarize_parameter_sweep_records` when PyRecEst is on `PYTHONPATH`; the repository contains an equivalent fallback so its smoke pipeline remains self-contained.
+
+The smoothing-gain command writes `smoothing_gain_raw.csv` and `smoothing_gain_summary.csv`. It compares filtered and smoothed circular means with simulated latent states over 500 sequences and reports a trial-bootstrap confidence interval. It deliberately makes no filter-to-smoother $L^1$ reduction claim because filtering and smoothing target different posterior densities.
+
+Runtime covers the forward filter and backward smoother. Dense FIGF interpolation, PWC evaluation, PF KDE reconstruction, transition-kernel construction, and reference generation are excluded. Thus FIGFAN and FIGFDN share one runtime curve. Paper timing values must be measured on `gpuserver6000` while the server is idle. The metadata sidecar records the host, load averages, software versions, git revision, source-tree hash, full configuration, and timing scope. A staged source tree without `.git` can supply the revision through `FOURIER_SMOOTHING_GIT_COMMIT`.
 
 Additional diagnostics are still available:
 
@@ -100,7 +105,7 @@ After generating CSV results, create figures and tables in the paper repository 
 
 ```bash
 python scripts/plot_paper_results.py --results-dir ../2026-07-FourierSmoothing-Paper/results --figures-dir ../2026-07-FourierSmoothing-Paper/figures
-python scripts/write_latex_tables.py --results-dir ../2026-07-FourierSmoothing-Paper/results --tables-dir ../2026-07-FourierSmoothing-Paper/tex/tables
+python scripts/write_latex_tables.py --results-dir ../2026-07-FourierSmoothing-Paper/results --tables-dir ../2026-07-FourierSmoothing-Paper/tables
 python scripts/plot_smoothing_hero.py --figures-dir ../2026-07-FourierSmoothing-Paper/figures
 ```
 

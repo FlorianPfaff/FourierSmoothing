@@ -11,11 +11,13 @@ from fourier_smoothing import (
     make_sharp_multimodal_likelihoods,
     run_identity_torus_benchmark,
     run_figf_pwc_benchmark,
+    run_smoothing_gain_evaluation,
     run_smoothing_evaluation,
     run_truncation_negativity_diagnostic,
     write_benchmark_csv,
     write_figf_pwc_csv,
     write_negativity_csv,
+    write_smoothing_gain_csv,
     write_smoothing_evaluation_csv,
 )
 
@@ -107,7 +109,7 @@ def test_smoothing_evaluation_writes_csv(tmp_path):
         time_steps=3,
         l1_reference_grid_size=65,
         mean_reference_particles=200,
-        particle_chunk_size=50,
+        mean_reference_repetitions=1,
         pwc_quadrature_points=3,
         seed=7,
     )
@@ -123,6 +125,33 @@ def test_smoothing_evaluation_writes_csv(tmp_path):
         loaded_rows = list(csv.DictReader(handle))
     assert len(loaded_rows) == len(rows)
     assert loaded_rows[0]["method"] in {"FIGFAN", "FIGFDN", "PWC", "PF"}
+
+
+def test_smoothing_gain_evaluation_writes_csv(tmp_path):
+    rows = run_smoothing_gain_evaluation(
+        n_trials=2,
+        grid_size=33,
+        time_steps=3,
+        seed=7,
+    )
+    assert len(rows) == 6
+    assert {row.trial for row in rows} == {0, 1}
+    assert {row.time_step for row in rows} == {0, 1, 2}
+    assert all(np.isfinite(row.filter_error_rad) for row in rows)
+    assert all(np.isfinite(row.smoother_error_rad) for row in rows)
+    assert all(row.filter_error_rad >= 0.0 for row in rows)
+    assert all(row.smoother_error_rad >= 0.0 for row in rows)
+    final_rows = [row for row in rows if row.time_step == 2]
+    np.testing.assert_allclose(
+        [row.filter_error_rad for row in final_rows],
+        [row.smoother_error_rad for row in final_rows],
+    )
+
+    output_path = write_smoothing_gain_csv(rows, tmp_path / "smoothing_gain_raw.csv")
+    with output_path.open(newline="", encoding="utf-8") as handle:
+        loaded_rows = list(csv.DictReader(handle))
+    assert len(loaded_rows) == len(rows)
+    assert loaded_rows[0]["trial"] == "0"
 
 
 def test_truncation_negativity_diagnostic_writes_csv(tmp_path):

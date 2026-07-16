@@ -15,6 +15,7 @@ TABLE_FILENAMES = {
     "particle": "particle_baseline.tex",
     "figf_pwc": "figf_pwc_benchmark.tex",
     "smoothing": "smoothing_evaluation.tex",
+    "smoothing_gain": "smoothing_gain.tex",
 }
 
 
@@ -37,6 +38,11 @@ def write_latex_tables(results_dir: str | Path, tables_dir: str | Path) -> list[
         ("figf_pwc_benchmark.csv", tables_path / TABLE_FILENAMES["figf_pwc"], _figf_pwc_table),
         ("smoothing_evaluation_summary.csv", tables_path / TABLE_FILENAMES["smoothing"], _smoothing_summary_table),
         ("smoothing_evaluation_raw.csv", tables_path / TABLE_FILENAMES["smoothing"], _smoothing_raw_table),
+        (
+            "smoothing_gain_summary.csv",
+            tables_path / TABLE_FILENAMES["smoothing_gain"],
+            _smoothing_gain_table,
+        ),
     ]
 
     written: list[Path] = []
@@ -202,6 +208,48 @@ def _smoothing_raw_table(rows: Sequence[Mapping[str, str]]) -> str:
         rows=body,
         caption_comment="Main smoothing evaluation summary generated from raw repetitions.",
     )
+
+
+def _smoothing_gain_table(rows: Sequence[Mapping[str, str]]) -> str:
+    order = {"all": 0, "early": 1, "late": 2}
+    labels = {
+        "all": r"All $t<T$",
+        "early": r"Early half",
+        "late": r"Late half",
+    }
+    sorted_rows = sorted(rows, key=lambda row: order.get(row["horizon"], 99))
+    n_trials = int(sorted_rows[0]["n_trials"])
+    body = []
+    for row in sorted_rows:
+        reduction = float(row["reduction_percent"])
+        ci_low = float(row["reduction_ci_low_percent"])
+        ci_high = float(row["reduction_ci_high_percent"])
+        body.append(
+            [
+                labels.get(row["horizon"], _latex_escape(row["horizon"])),
+                f"{float(row['filter_mae_rad']):.3f}",
+                f"{float(row['smoother_mae_rad']):.3f}",
+                f"{reduction:.1f} [{ci_low:.1f}, {ci_high:.1f}]\\%",
+            ]
+        )
+
+    lines = [
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\scriptsize",
+        (
+            r"\caption{Circular state-estimation MAE before and after smoothing over "
+            f"{n_trials} simulated sequences. The reduction column reports a trial-bootstrap 95\\% CI.}}"
+        ),
+        r"\label{tab:smoothing-gain}",
+        r"\begin{tabular}{lrrr}",
+        r"\toprule",
+        "Horizon & Filter [rad] & Smoother [rad] & Reduction [\\%] \\\\",
+        r"\midrule",
+    ]
+    lines.extend(" & ".join(row) + " \\\\" for row in body)
+    lines.extend([r"\bottomrule", r"\end{tabular}", r"\end{table}", ""])
+    return "\n".join(lines)
 
 
 def _tabular(*, columns: str, header: Sequence[str], rows: Sequence[Sequence[str]], caption_comment: str) -> str:

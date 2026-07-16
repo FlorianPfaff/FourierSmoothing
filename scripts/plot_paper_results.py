@@ -51,6 +51,8 @@ def main() -> None:
 def _plot_smoothing_evaluation(csv_path: Path, figures_dir: Path, formats: list[str]) -> list[Path]:
     import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
 
+    _configure_paper_style(plt)
+
     rows = []
     with csv_path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
@@ -59,8 +61,11 @@ def _plot_smoothing_evaluation(csv_path: Path, figures_dir: Path, formats: list[
                     "method": row["method"],
                     "parameter": int(row["parameter"]),
                     "runtime_s": float(row["runtime_s_mean"]),
+                    "runtime_s_std": float(row["runtime_s_std"]),
                     "mean_error_rad": float(row["mean_error_rad_mean"]),
+                    "mean_error_rad_std": float(row["mean_error_rad_std"]),
                     "l1_error": float(row["l1_error_mean"]),
+                    "l1_error_std": float(row["l1_error_std"]),
                 }
             )
 
@@ -73,7 +78,7 @@ def _plot_smoothing_evaluation(csv_path: Path, figures_dir: Path, formats: list[
             rows,
             methods,
             metric="mean_error_rad",
-            ylabel="mean circular-mean error [rad]",
+            ylabel="mean-direction error [rad]",
             title="Mean error",
             output_base=figures_dir / "smoothing_mean_error_by_parameter",
             formats=formats,
@@ -85,7 +90,7 @@ def _plot_smoothing_evaluation(csv_path: Path, figures_dir: Path, formats: list[
             rows,
             methods,
             metric="l1_error",
-            ylabel="mean L1 error",
+            ylabel=r"mean $L^1$ error",
             title="L1 density error",
             output_base=figures_dir / "smoothing_l1_error_by_parameter",
             formats=formats,
@@ -110,7 +115,7 @@ def _plot_smoothing_evaluation(csv_path: Path, figures_dir: Path, formats: list[
             rows,
             methods,
             metric="mean_error_rad",
-            ylabel="mean circular-mean error [rad]",
+            ylabel="mean-direction error [rad]",
             title="Mean error over runtime",
             output_base=figures_dir / "smoothing_mean_error_by_runtime",
             formats=formats,
@@ -121,7 +126,7 @@ def _plot_smoothing_evaluation(csv_path: Path, figures_dir: Path, formats: list[
             rows,
             methods,
             metric="l1_error",
-            ylabel="mean L1 error",
+            ylabel=r"mean $L^1$ error",
             title="L1 error over runtime",
             output_base=figures_dir / "smoothing_l1_error_by_runtime",
             formats=formats,
@@ -142,14 +147,26 @@ def _plot_metric_by_parameter(
     log_y: bool,
 ) -> list[Path]:
     import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
+    import numpy as np  # pylint: disable=import-outside-toplevel
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(3.45, 2.55), constrained_layout=True)
     for method in methods:
-        values = sorted((row["parameter"], _metric_plot_value(row, metric)) for row in rows if row["method"] == method)
-        ax.plot([n for n, _ in values], [v for _, v in values], label=method, **_method_plot_style(method))
-    ax.set_xlabel("grid points / particles")
+        method_rows = sorted((row for row in rows if row["method"] == method), key=lambda row: row["parameter"])
+        parameters = np.asarray([row["parameter"] for row in method_rows], dtype=float)
+        values = np.asarray([_metric_plot_value(row, metric) for row in method_rows], dtype=float)
+        deviations = np.asarray([_metric_plot_deviation(row, metric) for row in method_rows], dtype=float)
+        deviations = np.minimum(deviations, 0.8 * values)
+        ax.errorbar(
+            parameters,
+            values,
+            yerr=deviations,
+            label=method,
+            capsize=1.5,
+            elinewidth=0.65,
+            **_method_plot_style(method),
+        )
+    ax.set_xlabel(r"grid points $L$ / particles $N$")
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
     ax.set_xscale("log")
     if log_y and all(row[metric] > 0.0 for row in rows):
         ax.set_yscale("log")
@@ -157,8 +174,8 @@ def _plot_metric_by_parameter(
             ax.yaxis.set_major_locator(_runtime_log_locator())
             ax.yaxis.set_major_formatter(_plain_number_formatter())
             ax.yaxis.set_minor_formatter(_blank_formatter())
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    ax.legend(frameon=True, framealpha=0.9)
+    ax.grid(True, which="major", color="#B8B8B8", linewidth=0.45, alpha=0.65)
     written = _save_all(fig, output_base, formats)
     plt.close(fig)
     return written
@@ -175,14 +192,31 @@ def _plot_metric_by_runtime(
     formats: list[str],
 ) -> list[Path]:
     import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
+    import numpy as np  # pylint: disable=import-outside-toplevel
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(3.45, 2.55), constrained_layout=True)
     for method in methods:
-        values = sorted((1000.0 * row["runtime_s"], row[metric]) for row in rows if row["method"] == method)
-        ax.plot([runtime for runtime, _ in values], [v for _, v in values], label=method, **_method_plot_style(method))
+        method_rows = sorted((row for row in rows if row["method"] == method), key=lambda row: row["runtime_s"])
+        runtimes = 1000.0 * np.asarray([row["runtime_s"] for row in method_rows], dtype=float)
+        values = np.asarray([row[metric] for row in method_rows], dtype=float)
+        runtime_deviations = 1000.0 * np.asarray([row["runtime_s_std"] for row in method_rows], dtype=float)
+        metric_deviations = np.asarray([row[f"{metric}_std"] for row in method_rows], dtype=float)
+        runtime_deviations = np.minimum(runtime_deviations, 0.8 * runtimes)
+        metric_deviations = np.minimum(metric_deviations, 0.8 * values)
+        style = _method_plot_style(method)
+        style["linestyle"] = "none"
+        ax.errorbar(
+            runtimes,
+            values,
+            xerr=runtime_deviations,
+            yerr=metric_deviations,
+            label=method,
+            capsize=1.5,
+            elinewidth=0.65,
+            **style,
+        )
     ax.set_xlabel("runtime [ms]")
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
     if all(row["runtime_s"] > 0.0 for row in rows):
         ax.set_xscale("log")
         ax.xaxis.set_major_locator(_runtime_log_locator())
@@ -190,8 +224,8 @@ def _plot_metric_by_runtime(
         ax.xaxis.set_minor_formatter(_blank_formatter())
     if all(row[metric] > 0.0 for row in rows):
         ax.set_yscale("log")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    ax.legend(frameon=True, framealpha=0.9)
+    ax.grid(True, which="major", color="#B8B8B8", linewidth=0.45, alpha=0.65)
     written = _save_all(fig, output_base, formats)
     plt.close(fig)
     return written
@@ -199,6 +233,13 @@ def _plot_metric_by_runtime(
 
 def _metric_plot_value(row: dict[str, str | int | float], metric: str) -> float:
     value = float(row[metric])
+    if metric == "runtime_s":
+        return 1000.0 * value
+    return value
+
+
+def _metric_plot_deviation(row: dict[str, str | int | float], metric: str) -> float:
+    value = float(row.get(f"{metric}_std", 0.0))
     if metric == "runtime_s":
         return 1000.0 * value
     return value
@@ -236,15 +277,47 @@ def _blank_formatter():
     return NullFormatter()
 
 
-def _method_plot_style(method: str) -> dict[str, str]:
+def _method_plot_style(method: str) -> dict[str, object]:
     styles = {
-        "FIGF": {"marker": "o", "linestyle": "-"},
-        "FIGFAN": {"marker": "o", "linestyle": "-"},
-        "FIGFDN": {"marker": "s", "linestyle": "--"},
-        "PF": {"marker": "^", "linestyle": "-."},
-        "PWC": {"marker": "D", "linestyle": ":"},
+        "FIGF": {"marker": "o", "linestyle": "-", "color": "#0072B2"},
+        "FIGFAN": {"marker": "o", "linestyle": "-", "color": "#0072B2"},
+        "FIGFDN": {
+            "marker": "s",
+            "linestyle": "--",
+            "color": "#E69F00",
+            "markerfacecolor": "none",
+            "markeredgewidth": 0.9,
+        },
+        "PF": {"marker": "^", "linestyle": "-.", "color": "#009E73"},
+        "PWC": {
+            "marker": "D",
+            "linestyle": ":",
+            "color": "#D55E00",
+            "markerfacecolor": "none",
+            "markeredgewidth": 0.9,
+        },
     }
-    return styles.get(method, {"marker": "o", "linestyle": "-"})
+    return {"markersize": 3.6, **styles.get(method, {"marker": "o", "linestyle": "-"})}
+
+
+def _configure_paper_style(plt) -> None:
+    plt.rcParams.update(
+        {
+            "font.family": "serif",
+            "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+            "mathtext.fontset": "stix",
+            "font.size": 8,
+            "axes.labelsize": 8,
+            "xtick.labelsize": 7,
+            "ytick.labelsize": 7,
+            "legend.fontsize": 7,
+            "lines.linewidth": 1.05,
+            "axes.linewidth": 0.65,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "savefig.dpi": 300,
+        }
+    )
 
 
 def _plot_figf_pwc_benchmark(csv_path: Path, figures_dir: Path, formats: list[str]) -> list[Path]:

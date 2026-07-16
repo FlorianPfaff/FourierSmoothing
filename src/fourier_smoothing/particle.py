@@ -134,6 +134,44 @@ def bootstrap_particle_filter_1d(
     return ParticleFilterResult(particles=particles, weights=weights)
 
 
+def bootstrap_von_mises_particle_filter_1d(
+    likelihoods: ArrayLike,
+    noise_concentration: float,
+    n_particles: int,
+    *,
+    rng: np.random.Generator | int | None = None,
+) -> ParticleFilterResult:
+    """Bootstrap particle filter with exact von-Mises innovations.
+
+    The initial density is uniform on the circle and ``likelihoods[t]`` is
+    evaluated by periodic linear interpolation. Systematic resampling is used
+    before every prediction step.
+    """
+
+    if n_particles <= 0:
+        raise ValueError("n_particles must be positive.")
+    if noise_concentration < 0.0:
+        raise ValueError("noise_concentration must be nonnegative.")
+    rng = _as_rng(rng)
+    likelihood_array = np.asarray(likelihoods, dtype=float)
+    if likelihood_array.ndim != 2 or likelihood_array.shape[0] < 1:
+        raise ValueError("likelihoods must have shape (T, n_grid).")
+
+    time_steps = likelihood_array.shape[0]
+    particles = np.empty((time_steps, n_particles), dtype=float)
+    weights = np.empty((time_steps, n_particles), dtype=float)
+    particles[0] = rng.uniform(0.0, TWOPI, size=n_particles)
+    weights[0] = _normalize_weights(periodic_linear_interpolate_1d(likelihood_array[0], particles[0]))
+
+    for t in range(1, time_steps):
+        ancestor_indices = systematic_resample(weights[t - 1], rng)
+        innovations = rng.vonmises(0.0, noise_concentration, size=n_particles)
+        particles[t] = np.mod(particles[t - 1, ancestor_indices] + innovations, TWOPI)
+        weights[t] = _normalize_weights(periodic_linear_interpolate_1d(likelihood_array[t], particles[t]))
+
+    return ParticleFilterResult(particles=particles, weights=weights)
+
+
 def ffbsi_particle_smoother_1d(
     filter_result: ParticleFilterResult,
     noise_density: ArrayLike,
@@ -176,10 +214,99 @@ def ffbsi_particle_smoother_1d(
     )
 
 
+def ffbsi_von_mises_particle_smoother_1d(
+    filter_result: ParticleFilterResult,
+    noise_concentration: float,
+    n_trajectories: int,
+    *,
+    rng: np.random.Generator | int | None = None,
+    max_rejection_rounds: int = 10_000,
+) -> ParticleSmoothingResult:
+    """FFBSi smoother using exact rejection sampling for von-Mises dynamics.
+
+    Ancestor proposals are drawn from the filtering weights. For an additive
+    von-Mises transition, ``exp(kappa * (cos(delta) - 1))`` is the transition
+    density divided by its global maximum, so accepted proposals follow the
+    exact FFBSi backward distribution.
+    """
+
+    if n_trajectories <= 0:
+        raise ValueError("n_trajectories must be positive.")
+    if noise_concentration < 0.0:
+        raise ValueError("noise_concentration must be nonnegative.")
+    if max_rejection_rounds < 1:
+        raise ValueError("max_rejection_rounds must be positive.")
+    rng = _as_rng(rng)
+
+    particles = np.asarray(filter_result.particles, dtype=float)
+    weights = np.asarray(filter_result.weights, dtype=float)
+    if particles.shape != weights.shape or particles.ndim != 2:
+        raise ValueError("particles and weights must both have shape (T, n_particles).")
+
+    time_steps, n_particles = particles.shape
+    trajectories = np.empty((n_trajectories, time_steps), dtype=float)
+    final_cdf = np.cumsum(_normalize_weights(weights[-1]))
+    final_indices = np.searchsorted(final_cdf, rng.random(n_trajectories), side="right")
+    trajectories[:, -1] = particles[-1, np.minimum(final_indices, n_particles - 1)]
+
+    for t in range(time_steps - 2, -1, -1):
+        cdf = np.cumsum(_normalize_weights(weights[t]))
+        next_states = trajectories[:, t + 1]
+        pending = np.arange(n_trajectories, dtype=np.int64)
+        rounds = 0
+        while pending.size:
+            rounds += 1
+            proposal_indices = np.searchsorted(cdf, rng.random(pending.size), side="right")
+            proposal_indices = np.minimum(proposal_indices, n_particles - 1)
+            proposed_states = particles[t, proposal_indices]
+            log_acceptance = noise_concentration * (np.cos(next_states[pending] - proposed_states) - 1.0)
+            accepted = np.log(np.maximum(rng.random(pending.size), np.finfo(float).tiny)) <= log_acceptance
+            if np.any(accepted):
+                trajectories[pending[accepted], t] = proposed_states[accepted]
+            pending = pending[~accepted]
+            if rounds >= max_rejection_rounds and pending.size:
+                _sample_exact_von_mises_ancestors(
+                    trajectories,
+                    pending,
+                    t,
+                    next_states,
+                    particles[t],
+                    weights[t],
+                    noise_concentration,
+                    rng,
+                )
+                break
+
+    return ParticleSmoothingResult(
+        trajectories=trajectories,
+        mean_directions=circular_mean(trajectories, axis=0),
+    )
+
+
 def transition_density_from_noise_1d(noise_density: ArrayLike, displacement: ArrayLike) -> NDArray[np.float64]:
     """Evaluate ``p_w(displacement mod 2*pi)`` from a grid density."""
 
     return periodic_linear_interpolate_1d(noise_density, np.mod(displacement, TWOPI))
+
+
+def _sample_exact_von_mises_ancestors(
+    trajectories: NDArray[np.float64],
+    pending: NDArray[np.int64],
+    t: int,
+    next_states: NDArray[np.float64],
+    particles: NDArray[np.float64],
+    weights: NDArray[np.float64],
+    concentration: float,
+    rng: np.random.Generator,
+) -> None:
+    """Fallback for rejection tails; normally no trajectory reaches this path."""
+
+    for trajectory_index in pending:
+        log_transition = concentration * np.cos(next_states[trajectory_index] - particles)
+        log_transition -= np.max(log_transition)
+        probabilities = _normalize_weights(weights * np.exp(log_transition))
+        ancestor_index = rng.choice(particles.size, p=probabilities)
+        trajectories[trajectory_index, t] = particles[ancestor_index]
 
 
 def _normalize_weights(weights: NDArray[np.float64]) -> NDArray[np.float64]:

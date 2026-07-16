@@ -3,8 +3,10 @@ import numpy as np
 from fourier_smoothing import make_identity_likelihoods, make_von_mises_like_noise
 from fourier_smoothing.particle import (
     bootstrap_particle_filter_1d,
+    bootstrap_von_mises_particle_filter_1d,
     circular_mean,
     ffbsi_particle_smoother_1d,
+    ffbsi_von_mises_particle_smoother_1d,
     periodic_linear_interpolate_1d,
     systematic_resample,
 )
@@ -48,6 +50,27 @@ def test_ffbsi_particle_smoother_shapes_and_ranges():
     assert np.all(smoothed.trajectories < 2.0 * np.pi)
     assert np.all(smoothed.mean_directions >= 0.0)
     assert np.all(smoothed.mean_directions < 2.0 * np.pi)
+
+
+def test_von_mises_particle_filter_and_rejection_ffbsi_are_reproducible():
+    grid_size = 65
+    angles = np.linspace(0.0, 2.0 * np.pi, grid_size, endpoint=False)
+    likelihoods = np.stack(
+        [np.exp(3.0 * np.cos(angles - phase)) for phase in (0.2, 0.5, 0.9)],
+        axis=0,
+    )
+
+    first_filter = bootstrap_von_mises_particle_filter_1d(likelihoods, 4.0, 200, rng=5)
+    second_filter = bootstrap_von_mises_particle_filter_1d(likelihoods, 4.0, 200, rng=5)
+    np.testing.assert_allclose(first_filter.particles, second_filter.particles)
+    np.testing.assert_allclose(first_filter.weights, second_filter.weights)
+
+    first = ffbsi_von_mises_particle_smoother_1d(first_filter, 4.0, 150, rng=7)
+    second = ffbsi_von_mises_particle_smoother_1d(second_filter, 4.0, 150, rng=7)
+    assert first.trajectories.shape == (150, 3)
+    np.testing.assert_allclose(first.trajectories, second.trajectories)
+    np.testing.assert_allclose(first.mean_directions, second.mean_directions)
+    assert np.all((first.trajectories >= 0.0) & (first.trajectories < 2.0 * np.pi))
 
 
 def test_circular_mean_for_nearby_samples_is_finite():

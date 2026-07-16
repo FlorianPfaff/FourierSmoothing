@@ -114,15 +114,41 @@ def test_write_latex_tables_from_known_result_csvs(tmp_path):
             }
         ],
     )
+    _write_csv(
+        results_dir / "smoothing_gain_summary.csv",
+        [
+            "horizon",
+            "n_trials",
+            "n_time_steps",
+            "filter_mae_rad",
+            "smoother_mae_rad",
+            "reduction_percent",
+            "reduction_ci_low_percent",
+            "reduction_ci_high_percent",
+        ],
+        [
+            {
+                "horizon": "all",
+                "n_trials": "500",
+                "n_time_steps": "19",
+                "filter_mae_rad": "0.4",
+                "smoother_mae_rad": "0.2",
+                "reduction_percent": "50.0",
+                "reduction_ci_low_percent": "45.0",
+                "reduction_ci_high_percent": "55.0",
+            }
+        ],
+    )
 
     written = write_latex_tables(results_dir, tables_dir)
 
-    assert len(written) == 4
+    assert len(written) == 5
     for filename in [
         TABLE_FILENAMES["identity"],
         TABLE_FILENAMES["negativity"],
         TABLE_FILENAMES["particle"],
         TABLE_FILENAMES["smoothing"],
+        TABLE_FILENAMES["smoothing_gain"],
     ]:
         content = (tables_dir / filename).read_text(encoding="utf-8")
         assert "\\begin{tabular}" in content
@@ -134,3 +160,6 @@ def test_write_latex_tables_from_known_result_csvs(tmp_path):
     smoothing_content = (tables_dir / TABLE_FILENAMES["smoothing"]).read_text(encoding="utf-8")
     assert "0.004" in smoothing_content
     assert "9.9" not in smoothing_content
+    gain_table = (tables_dir / TABLE_FILENAMES["smoothing_gain"]).read_text(encoding="utf-8")
+    assert "trial-bootstrap 95\\% CI" in gain_table
+    assert "50.0 [45.0, 55.0]\\%" in gain_table

@@ -6,7 +6,7 @@ on:
       repetitions:
         description: Number of benchmark repetitions
         required: true
-        default: '5'
+        default: '30'
         type: string
       seed:
         description: Random seed
@@ -46,6 +46,23 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e '.[paper]'
           python -m pip freeze > paper_benchmark/environment/pip-freeze-after.txt
+
+      - name: Wait for an idle timing host
+        timeout-minutes: 180
+        run: |
+          consecutive=0
+          while [ "${consecutive}" -lt 3 ]; do
+            read -r load_one load_five load_fifteen _ < /proc/loadavg
+            if awk -v one="${load_one}" -v five="${load_five}" \
+              'BEGIN { exit !(one < 2.0 && five < 3.0) }'; then
+              consecutive=$((consecutive + 1))
+            else
+              consecutive=0
+            fi
+            printf 'idle gate %s/3 load=%s,%s,%s %s\n' \
+              "${consecutive}" "${load_one}" "${load_five}" "${load_fifteen}" "$(date --iso-8601=seconds)"
+            sleep 60
+          done
 
       - name: Run main paper benchmark
         run: |
