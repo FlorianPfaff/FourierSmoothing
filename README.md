@@ -68,7 +68,7 @@ python scripts/run_paper_artifact_pipeline.py \
   --profile paper \
   --results-dir ../2026-07-FourierSmoothing-Paper/results \
   --figures-dir ../2026-07-FourierSmoothing-Paper/figures \
-  --tables-dir ../2026-07-FourierSmoothing-Paper/tables
+  --tables-dir ../2026-07-FourierSmoothing-Paper/tex/tables
 ```
 
 The paper profile does not rerun the main timing evaluation by default, because its final runtimes should be measured on the designated server. Add `--include-smoothing-evaluation` to run it as part of the pipeline, or `--no-include-smoothing-evaluation` to skip it explicitly. The GitHub Actions workflow `Paper artifacts` runs the smoke pipeline and uploads generated CSV, figure, and table artifacts.
@@ -105,7 +105,7 @@ After generating CSV results, create figures and tables in the paper repository 
 
 ```bash
 python scripts/plot_paper_results.py --results-dir ../2026-07-FourierSmoothing-Paper/results --figures-dir ../2026-07-FourierSmoothing-Paper/figures
-python scripts/write_latex_tables.py --results-dir ../2026-07-FourierSmoothing-Paper/results --tables-dir ../2026-07-FourierSmoothing-Paper/tables
+python scripts/write_latex_tables.py --results-dir ../2026-07-FourierSmoothing-Paper/results --tables-dir ../2026-07-FourierSmoothing-Paper/tex/tables
 python scripts/plot_smoothing_hero.py --figures-dir ../2026-07-FourierSmoothing-Paper/figures
 ```
 

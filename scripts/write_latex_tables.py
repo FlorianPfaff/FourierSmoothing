@@ -12,7 +12,7 @@ from fourier_smoothing.tables import write_latex_tables
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", type=Path, default=Path("../2026-07-FourierSmoothing-Paper/results"))
-    parser.add_argument("--tables-dir", type=Path, default=Path("../2026-07-FourierSmoothing-Paper/tables"))
+    parser.add_argument("--tables-dir", type=Path, default=Path("../2026-07-FourierSmoothing-Paper/tex/tables"))
     return parser.parse_args()
 
 

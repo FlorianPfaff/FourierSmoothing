@@ -114,10 +114,10 @@ def main() -> None:
     tables_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Writing results to {results_dir}")
-    _run_legacy_diagnostics(config, results_dir)
     if include_smoothing_evaluation:
         print("Generating main FIGFAN/FIGFDN/PWC/PF smoothing evaluation")
         _run_main_smoothing_evaluation(config, results_dir, repository_root)
+    _run_legacy_diagnostics(config, results_dir)
     _run_smoothing_gain(config, results_dir, repository_root)
 
     if not args.skip_plots:
