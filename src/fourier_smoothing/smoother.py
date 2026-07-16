@@ -329,10 +329,13 @@ def multiply_fourier_truncated(
         raise ValueError(f"output_shape must have length {a.ndim}, got {len(output_shape)}")
 
     full_shape = tuple(sa + sb - 1 for sa, sb in zip(a.shape, b.shape))
+    axes = tuple(range(a.ndim))
     a_centered = np.fft.fftshift(a)
     b_centered = np.fft.fftshift(b)
     full_centered = np.fft.ifftn(
-        np.fft.fftn(a_centered, full_shape) * np.fft.fftn(b_centered, full_shape)
+        np.fft.fftn(a_centered, full_shape, axes=axes)
+        * np.fft.fftn(b_centered, full_shape, axes=axes),
+        axes=axes,
     )
     truncated_centered = _center_pad_or_crop(full_centered, output_shape)
     return np.fft.ifftshift(truncated_centered)
