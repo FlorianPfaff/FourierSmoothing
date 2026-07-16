@@ -132,6 +132,15 @@ def _plot_smoothing_evaluation(csv_path: Path, figures_dir: Path, formats: list[
             formats=formats,
         )
     )
+    written.extend(
+        _plot_runtime_accuracy_summary(
+            rows,
+            methods,
+            runtime_rows,
+            figures_dir / "smoothing_runtime_accuracy_summary",
+            formats,
+        )
+    )
     return written
 
 
@@ -147,9 +156,17 @@ def _plot_metric_by_parameter(
     log_y: bool,
 ) -> list[Path]:
     import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
-    import numpy as np  # pylint: disable=import-outside-toplevel
 
     fig, ax = plt.subplots(figsize=(3.45, 2.55), constrained_layout=True)
+    _draw_metric_by_parameter(ax, rows, methods, metric=metric, ylabel=ylabel, title=title, log_y=log_y)
+    written = _save_all(fig, output_base, formats)
+    plt.close(fig)
+    return written
+
+
+def _draw_metric_by_parameter(ax, rows, methods, *, metric: str, ylabel: str, title: str, log_y: bool) -> None:
+    import numpy as np  # pylint: disable=import-outside-toplevel
+
     for method in methods:
         method_rows = sorted((row for row in rows if row["method"] == method), key=lambda row: row["parameter"])
         parameters = np.asarray([row["parameter"] for row in method_rows], dtype=float)
@@ -167,6 +184,7 @@ def _plot_metric_by_parameter(
         )
     ax.set_xlabel(r"grid points $L$ / particles $N$")
     ax.set_ylabel(ylabel)
+    ax.set_title(title)
     ax.set_xscale("log")
     if log_y and all(row[metric] > 0.0 for row in rows):
         ax.set_yscale("log")
@@ -176,9 +194,6 @@ def _plot_metric_by_parameter(
             ax.yaxis.set_minor_formatter(_blank_formatter())
     ax.legend(frameon=True, framealpha=0.9)
     ax.grid(True, which="major", color="#B8B8B8", linewidth=0.45, alpha=0.65)
-    written = _save_all(fig, output_base, formats)
-    plt.close(fig)
-    return written
 
 
 def _plot_metric_by_runtime(
@@ -192,9 +207,17 @@ def _plot_metric_by_runtime(
     formats: list[str],
 ) -> list[Path]:
     import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
-    import numpy as np  # pylint: disable=import-outside-toplevel
 
     fig, ax = plt.subplots(figsize=(3.45, 2.55), constrained_layout=True)
+    _draw_metric_by_runtime(ax, rows, methods, metric=metric, ylabel=ylabel, title=title)
+    written = _save_all(fig, output_base, formats)
+    plt.close(fig)
+    return written
+
+
+def _draw_metric_by_runtime(ax, rows, methods, *, metric: str, ylabel: str, title: str) -> None:
+    import numpy as np  # pylint: disable=import-outside-toplevel
+
     for method in methods:
         method_rows = sorted((row for row in rows if row["method"] == method), key=lambda row: row["runtime_s"])
         runtimes = 1000.0 * np.asarray([row["runtime_s"] for row in method_rows], dtype=float)
@@ -217,6 +240,7 @@ def _plot_metric_by_runtime(
         )
     ax.set_xlabel("runtime [ms]")
     ax.set_ylabel(ylabel)
+    ax.set_title(title)
     if all(row["runtime_s"] > 0.0 for row in rows):
         ax.set_xscale("log")
         ax.xaxis.set_major_locator(_runtime_log_locator())
@@ -226,6 +250,46 @@ def _plot_metric_by_runtime(
         ax.set_yscale("log")
     ax.legend(frameon=True, framealpha=0.9)
     ax.grid(True, which="major", color="#B8B8B8", linewidth=0.45, alpha=0.65)
+
+
+def _plot_runtime_accuracy_summary(
+    rows: list[dict[str, str | int | float]],
+    methods: list[str],
+    runtime_rows: list[dict[str, str | int | float]],
+    output_base: Path,
+    formats: list[str],
+) -> list[Path]:
+    import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
+
+    fig, axes = plt.subplots(1, 3, figsize=(7.12, 2.05), constrained_layout=True)
+    runtime_methods = [
+        method for method in ["FIGF", "PF", "PWC"] if any(row["method"] == method for row in runtime_rows)
+    ]
+    _draw_metric_by_parameter(
+        axes[0],
+        runtime_rows,
+        runtime_methods,
+        metric="runtime_s",
+        ylabel="runtime [ms]",
+        title="(a) Runtime scaling",
+        log_y=True,
+    )
+    _draw_metric_by_runtime(
+        axes[1],
+        rows,
+        methods,
+        metric="mean_error_rad",
+        ylabel="mean-direction error [rad]",
+        title="(b) Mean error",
+    )
+    _draw_metric_by_runtime(
+        axes[2],
+        rows,
+        methods,
+        metric="l1_error",
+        ylabel=r"mean $L^1$ error",
+        title=r"(c) $L^1$ density error",
+    )
     written = _save_all(fig, output_base, formats)
     plt.close(fig)
     return written
