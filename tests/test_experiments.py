@@ -13,6 +13,7 @@ from fourier_smoothing import (
     run_figf_pwc_benchmark,
     run_smoothing_gain_evaluation,
     run_smoothing_evaluation,
+    run_smoothing_runtime_evaluation,
     run_truncation_negativity_diagnostic,
     write_benchmark_csv,
     write_figf_pwc_csv,
@@ -125,6 +126,31 @@ def test_smoothing_evaluation_writes_csv(tmp_path):
         loaded_rows = list(csv.DictReader(handle))
     assert len(loaded_rows) == len(rows)
     assert loaded_rows[0]["method"] in {"FIGFAN", "FIGFDN", "PWC", "PF"}
+
+
+def test_smoothing_runtime_evaluation_matches_error_row_keys():
+    rows = run_smoothing_runtime_evaluation(
+        figf_grid_sizes=[9],
+        pwc_grid_sizes=[9],
+        pf_particle_counts=[30],
+        repetitions=2,
+        time_steps=3,
+        particle_likelihood_grid_size=65,
+        pwc_quadrature_points=3,
+        seed=7,
+    )
+
+    assert len(rows) == 8
+    assert {row.method for row in rows} == {"FIGFAN", "FIGFDN", "PWC", "PF"}
+    assert all(row.runtime_s >= 0.0 for row in rows)
+    assert {(row.method, row.parameter, row.repetition) for row in rows} == {
+        (method, parameter, repetition)
+        for method, parameter in (("FIGFAN", 9), ("FIGFDN", 9), ("PWC", 9), ("PF", 30))
+        for repetition in range(2)
+    }
+    for repetition in range(2):
+        figf_rows = [row for row in rows if row.repetition == repetition and row.method.startswith("FIGF")]
+        assert figf_rows[0].runtime_s == figf_rows[1].runtime_s
 
 
 def test_smoothing_gain_evaluation_writes_csv(tmp_path):

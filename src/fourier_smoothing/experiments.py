@@ -147,6 +147,24 @@ class SmoothingEvaluationRow:
 
 
 @dataclass(frozen=True)
+class SmoothingRuntimeRow:
+    """One timing-only row for the smoother comparison."""
+
+    method: str
+    parameter: int
+    repetition: int
+    runtime_s: float
+
+    def as_dict(self) -> dict[str, str | int | float]:
+        return {
+            "method": self.method,
+            "parameter": self.parameter,
+            "repetition": self.repetition,
+            "runtime_s": self.runtime_s,
+        }
+
+
+@dataclass(frozen=True)
 class SmoothingGainRow:
     """One state-truth error pair from the smoothing-gain simulation."""
 
@@ -694,6 +712,105 @@ def run_smoothing_evaluation(
                 )
             )
 
+    return rows
+
+
+def run_smoothing_runtime_evaluation(
+    figf_grid_sizes: Iterable[int] = (15, 31, 63, 127, 255, 511, 1023, 2047, 4095),
+    pwc_grid_sizes: Iterable[int] = (15, 31, 63, 127, 255, 511, 1023, 2047, 4095),
+    pf_particle_counts: Iterable[int] = (100, 300, 1000, 3000, 10000),
+    *,
+    repetitions: int = 30,
+    time_steps: int = 9,
+    likelihood_sharpness: float = 5.0,
+    noise_concentration: float = 4.0,
+    particle_likelihood_grid_size: int = 65_535,
+    pwc_quadrature_points: int = 8,
+    seed: int = 1,
+) -> list[SmoothingRuntimeRow]:
+    """Time only the forward filters and backward smoothers.
+
+    Reference generation, interpolation, densification, and particle KDE work
+    are deliberately absent. The returned keys match :func:`run_smoothing_evaluation`
+    so timings from a controlled host can be paired with errors computed elsewhere.
+    """
+
+    figf_grid_sizes = _positive_int_tuple(figf_grid_sizes, "figf_grid_sizes")
+    pwc_grid_sizes = _positive_int_tuple(pwc_grid_sizes, "pwc_grid_sizes")
+    pf_particle_counts = _positive_int_tuple(pf_particle_counts, "pf_particle_counts")
+    if repetitions < 1:
+        raise ValueError("repetitions must be at least one.")
+    if time_steps < 1:
+        raise ValueError("time_steps must be at least one.")
+    if particle_likelihood_grid_size < 1:
+        raise ValueError("particle_likelihood_grid_size must be positive.")
+    if pwc_quadrature_points < 1:
+        raise ValueError("pwc_quadrature_points must be at least one.")
+
+    rows: list[SmoothingRuntimeRow] = []
+    for grid_size in figf_grid_sizes:
+        grid_shape = (grid_size,)
+        cell_volume = cell_volume_for_grid(grid_shape)
+        likelihoods = make_sharp_multimodal_likelihoods(
+            grid_shape,
+            time_steps,
+            sharpness=likelihood_sharpness,
+        )
+        noise = make_von_mises_like_noise(grid_shape, noise_concentration)
+        transition = TorusAdditiveGridTransition.for_grid_shape(noise, grid_shape)
+        for repetition in range(repetitions):
+            start = time.perf_counter()
+            filtered = _run_figf_forward_filter(likelihoods, noise, cell_volume)
+            grid_backward_information_smoother(filtered, likelihoods, transition, cell_volume=cell_volume)
+            runtime = time.perf_counter() - start
+            rows.append(SmoothingRuntimeRow("FIGFAN", grid_size, repetition, runtime))
+            rows.append(SmoothingRuntimeRow("FIGFDN", grid_size, repetition, runtime))
+
+    for grid_size in pwc_grid_sizes:
+        grid_shape = (grid_size,)
+        cell_volume = cell_volume_for_grid(grid_shape)
+        likelihoods = make_sharp_multimodal_likelihoods(
+            grid_shape,
+            time_steps,
+            sharpness=likelihood_sharpness,
+            grid_offset=0.5,
+        )
+        kernel = make_pwc_additive_transition_kernel_1d(
+            grid_size,
+            noise_concentration,
+            quadrature_points=pwc_quadrature_points,
+        )
+        for repetition in range(repetitions):
+            start = time.perf_counter()
+            filtered = _run_pwc_forward_filter(likelihoods, kernel, cell_volume)
+            grid_backward_information_smoother(
+                filtered,
+                likelihoods,
+                lambda message, _t: _pwc_backward_predict_fft(message, kernel, cell_volume),
+                cell_volume=cell_volume,
+            )
+            runtime = time.perf_counter() - start
+            rows.append(SmoothingRuntimeRow("PWC", grid_size, repetition, runtime))
+
+    particle_likelihoods = make_sharp_multimodal_likelihoods(
+        (int(particle_likelihood_grid_size),),
+        time_steps,
+        sharpness=likelihood_sharpness,
+    )
+    seed_sequence = np.random.SeedSequence(seed + 1000)
+    pf_seeds = iter(seed_sequence.spawn(len(pf_particle_counts) * repetitions))
+    for n_particles in pf_particle_counts:
+        for repetition in range(repetitions):
+            run_seed = int(next(pf_seeds).generate_state(1)[0])
+            start = time.perf_counter()
+            _run_von_mises_ffbsi_1d(
+                particle_likelihoods,
+                noise_concentration,
+                n_particles,
+                seed=run_seed,
+            )
+            runtime = time.perf_counter() - start
+            rows.append(SmoothingRuntimeRow("PF", n_particles, repetition, runtime))
     return rows
 
 
