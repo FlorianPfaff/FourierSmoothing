@@ -71,7 +71,7 @@ python scripts/run_paper_artifact_pipeline.py \
   --tables-dir ../2026-07-FourierSmoothing-Paper/tex/tables
 ```
 
-The paper profile does not rerun the main timing evaluation by default, because its final runtimes should be measured on the designated server. Add `--include-smoothing-evaluation` to run it as part of the pipeline, or `--no-include-smoothing-evaluation` to skip it explicitly. The GitHub Actions workflow `Paper artifacts` runs the smoke pipeline and uploads generated CSV, figure, and table artifacts.
+The paper profile does not rerun the main timing evaluation by default, because its final runtimes should be measured on the designated server. Add `--include-smoothing-evaluation` to run it as part of the pipeline, or `--no-include-smoothing-evaluation` to skip it explicitly. The GitHub Actions workflow `Paper benchmark on gpuserver6000` runs the controlled benchmark and uploads generated CSV, figure, table, and environment artifacts.
 
 ## Generate paper results
 
