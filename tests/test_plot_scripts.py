@@ -94,6 +94,7 @@ def test_plot_smoothing_hero_script_generates_figure(tmp_path):
             "--figures-dir",
             str(figures_dir),
             "--formats",
+            "pdf",
             "png",
             "--grid-size",
             "31",
@@ -103,4 +104,7 @@ def test_plot_smoothing_hero_script_generates_figure(tmp_path):
         check=True,
     )
 
+    hero_pdf = figures_dir / "smoothing_space_time.pdf"
+    assert hero_pdf.exists()
+    assert b"/Subtype /Type3" not in hero_pdf.read_bytes()
     assert (figures_dir / "smoothing_space_time.png").exists()

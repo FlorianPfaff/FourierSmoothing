@@ -142,6 +142,7 @@ def _plot_space_time_smoothing(
 ) -> list[Path]:
     import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
 
+    _configure_paper_style(plt)
     panels = [
         ("Filtered density", _column_normalize(filtered), filtered),
         ("Backward message", _column_normalize(backward), None),
@@ -185,6 +186,19 @@ def _plot_space_time_smoothing(
         written.append(output_path)
     plt.close(fig)
     return written
+
+
+def _configure_paper_style(plt) -> None:
+    plt.rcParams.update(
+        {
+            "font.family": "serif",
+            "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+            "mathtext.fontset": "stix",
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "savefig.dpi": 300,
+        }
+    )
 
 
 def _column_normalize(values: np.ndarray) -> np.ndarray:
