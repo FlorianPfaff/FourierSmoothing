@@ -54,7 +54,8 @@ def write_latex_tables(results_dir: str | Path, tables_dir: str | Path) -> list[
         if csv_path.exists():
             rows = _read_csv(csv_path)
             if rows:
-                output_path.write_text(writer(rows), encoding="utf-8")
+                with output_path.open("w", encoding="utf-8", newline="\n") as handle:
+                    handle.write(writer(rows))
                 written.append(output_path)
                 written_outputs.add(output_path)
     return written
