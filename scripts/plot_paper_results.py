@@ -91,7 +91,7 @@ def _plot_smoothing_evaluation(csv_path: Path, figures_dir: Path, formats: list[
             methods,
             metric="l1_error",
             ylabel=r"mean $L^1$ error",
-            title="L1 density error",
+            title=r"$L^1$ density error",
             output_base=figures_dir / "smoothing_l1_error_by_parameter",
             formats=formats,
             log_y=True,
@@ -127,7 +127,7 @@ def _plot_smoothing_evaluation(csv_path: Path, figures_dir: Path, formats: list[
             methods,
             metric="l1_error",
             ylabel=r"mean $L^1$ error",
-            title="L1 error over runtime",
+            title=r"$L^1$ error over runtime",
             output_base=figures_dir / "smoothing_l1_error_by_runtime",
             formats=formats,
         )
