@@ -149,13 +149,13 @@ def _plot_space_time_smoothing(
         ("Smoothed density", _column_normalize(smoothed), smoothed),
     ]
     time_steps = filtered.shape[0]
-    extent = (-0.5, time_steps - 0.5, -np.pi, np.pi)
+    extent = (-0.5, time_steps - 0.5, 0.0, 2.0 * np.pi)
 
     fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.35), sharey=True, constrained_layout=True)
     image = None
     for ax, (title, values, mean_source) in zip(axes, panels):
         image = ax.imshow(
-            _center_angle_axis(values).T,
+            values.T,
             origin="lower",
             aspect="auto",
             extent=extent,
@@ -172,8 +172,8 @@ def _plot_space_time_smoothing(
         ax.tick_params(axis="both", labelsize=8)
 
     axes[0].set_ylabel("angle")
-    axes[0].set_yticks([-np.pi, 0.0, np.pi])
-    axes[0].set_yticklabels([r"$-\pi$", "0", r"$\pi$"])
+    axes[0].set_yticks([0.0, np.pi, 2.0 * np.pi])
+    axes[0].set_yticklabels(["0", r"$\pi$", r"$2\pi$"])
     assert image is not None
     colorbar = fig.colorbar(image, ax=axes, shrink=0.82, pad=0.015)
     colorbar.set_label("relative contrast", fontsize=8)
@@ -209,15 +209,11 @@ def _column_normalize(values: np.ndarray) -> np.ndarray:
     return arr / maxima
 
 
-def _center_angle_axis(values: np.ndarray) -> np.ndarray:
-    return np.fft.fftshift(values, axes=1)
-
-
 def _plot_circular_mean(ax, density: np.ndarray) -> None:
     grid_size = density.shape[1]
     angles = np.linspace(0.0, 2.0 * np.pi, grid_size, endpoint=False)
     moments = np.sum(density * np.exp(1j * angles)[None, :], axis=1)
-    means = np.mod(np.angle(moments) + np.pi, 2.0 * np.pi) - np.pi
+    means = np.mod(np.angle(moments), 2.0 * np.pi)
     times = np.arange(density.shape[0], dtype=float)
     plot_times, plot_means = _break_wrapped_line(times, means)
     ax.plot(plot_times, plot_means, color="white", linewidth=1.2, alpha=0.95)
