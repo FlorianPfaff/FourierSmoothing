@@ -20,17 +20,21 @@ from .experiments import (
     make_identity_likelihoods,
     make_sharp_multimodal_likelihoods,
     make_von_mises_like_noise,
-    run_figf_pwc_benchmark,
     run_identity_torus_benchmark,
     run_smoothing_gain_evaluation,
-    run_smoothing_evaluation,
-    run_smoothing_runtime_evaluation,
     run_truncation_negativity_diagnostic,
     write_benchmark_csv,
     write_figf_pwc_csv,
     write_negativity_csv,
     write_smoothing_gain_csv,
     write_smoothing_evaluation_csv,
+)
+from . import experiments as _experiments
+from .paper_evaluation import (
+    make_pwc_cell_averaged_likelihoods_1d,
+    run_figf_pwc_benchmark,
+    run_smoothing_evaluation,
+    run_smoothing_runtime_evaluation,
 )
 from .general_transition import (
     fourier_general_backward_predict,
@@ -86,6 +90,12 @@ from .smoother import (
 )
 from .tables import TABLE_FILENAMES, write_latex_tables
 
+# Preserve the historical module-level API while routing the paper runners to
+# the representation-correct PWC implementation above.
+_experiments.run_figf_pwc_benchmark = run_figf_pwc_benchmark
+_experiments.run_smoothing_evaluation = run_smoothing_evaluation
+_experiments.run_smoothing_runtime_evaluation = run_smoothing_runtime_evaluation
+
 __all__ = [
     "BenchmarkRow",
     "DenseGridTransition",
@@ -120,9 +130,10 @@ __all__ = [
     "grid_backward_information_smoother",
     "grid_pairwise_smoothed_marginals",
     "grid_to_fourier",
-    "make_pwc_additive_transition_kernel_1d",
-    "make_pwc_additive_transition_density_matrix_1d",
     "make_identity_likelihoods",
+    "make_pwc_additive_transition_density_matrix_1d",
+    "make_pwc_additive_transition_kernel_1d",
+    "make_pwc_cell_averaged_likelihoods_1d",
     "make_sharp_multimodal_likelihoods",
     "make_von_mises_like_noise",
     "multiply_fourier_truncated",
