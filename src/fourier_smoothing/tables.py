@@ -215,8 +215,8 @@ def _smoothing_gain_table(rows: Sequence[Mapping[str, str]]) -> str:
     order = {"all": 0, "early": 1, "late": 2}
     labels = {
         "all": r"All $t<T$",
-        "early": r"Early half",
-        "late": r"Late half",
+        "early": r"Early 10 times",
+        "late": r"Late 9 times",
     }
     sorted_rows = sorted(rows, key=lambda row: order.get(row["horizon"], 99))
     n_trials = int(sorted_rows[0]["n_trials"])
