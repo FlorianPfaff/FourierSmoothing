@@ -9,6 +9,9 @@ from statistics import mean
 from typing import Mapping, Sequence
 
 
+LATEX_ROW_END = " " + chr(92) * 2
+
+
 TABLE_FILENAMES = {
     "identity": "identity_runtime.tex",
     "negativity": "truncation_negativity.tex",
@@ -245,10 +248,10 @@ def _smoothing_gain_table(rows: Sequence[Mapping[str, str]]) -> str:
         r"\label{tab:smoothing-gain}",
         r"\begin{tabular}{lrrr}",
         r"\toprule",
-        "Horizon & Filter [rad] & Smoother [rad] & Reduction [\\%] \\\",
+        "Horizon & Filter [rad] & Smoother [rad] & Reduction [\\%] \\\\",
         r"\midrule",
     ]
-    lines.extend(" & ".join(row) + " \\\" for row in body)
+    lines.extend(" & ".join(row) + LATEX_ROW_END for row in body)
     lines.extend([r"\bottomrule", r"\end{tabular}", r"\end{table}", ""])
     return "\n".join(lines)
 
@@ -258,10 +261,10 @@ def _tabular(*, columns: str, header: Sequence[str], rows: Sequence[Sequence[str
         f"% {caption_comment}",
         f"\\begin{{tabular}}{{{columns}}}",
         "\\toprule",
-        " & ".join(header) + r" \",
+        " & ".join(header) + r" \\",
         "\\midrule",
     ]
-    lines.extend(" & ".join(row) + r" \\" for row in rows)
+    lines.extend(" & ".join(row) + LATEX_ROW_END for row in rows)
     lines.extend(["\\bottomrule", "\\end{tabular}", ""])
     return "\n".join(lines)
 
