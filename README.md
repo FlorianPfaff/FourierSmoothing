@@ -2,7 +2,7 @@
 
 Experimental reference implementation of fixed-interval smoothing for Fourier/grid filters on hypertori.
 
-This repository is for **code**: Python package code, experiment scripts, tests, and reusable numerical utilities. Manuscript files, committed figures, and generated result tables belong in the separate `FlorianPfaff/2026-07-FourierSmoothing-Paper` repository.
+This repository is for **code**: Python package code, experiment scripts, tests, and reusable numerical utilities. Manuscript files and publication-layout sources belong in the separate `FlorianPfaff/2026-07-FourierSmoothing-Paper` repository. A public snapshot of every plotted benchmark point, the smoothing-gain summary, and split provenance metadata is retained under `paper_evidence/`.
 
 The current implementation focuses on the backward-information smoother
 
