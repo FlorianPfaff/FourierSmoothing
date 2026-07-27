@@ -1,11 +1,12 @@
 import csv
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 
-def test_runtime_accuracy_column_plot_uses_connected_curves(tmp_path):
+def test_runtime_accuracy_column_plot_uses_connected_curves_and_writes_pgf_data(tmp_path):
     pytest.importorskip("matplotlib")
 
     results_dir = tmp_path / "results"
@@ -58,6 +59,7 @@ def test_runtime_accuracy_column_plot_uses_connected_curves(tmp_path):
             "pdf",
             "png",
         ],
+        cwd=Path(__file__).resolve().parents[1],
         check=True,
     )
 
@@ -65,3 +67,14 @@ def test_runtime_accuracy_column_plot_uses_connected_curves(tmp_path):
     assert pdf_path.exists()
     assert b"/Subtype /Type3" not in pdf_path.read_bytes()
     assert (figures_dir / "smoothing_runtime_accuracy_column.png").exists()
+
+    data_dir = figures_dir / "data"
+    expected_files = {
+        "figfan": "9 1 0.03 0.02\n17 2 0.02 0.01\n",
+        "figfdn": "9 1 0.025 0.015\n17 2 0.02 0.01\n",
+        "pf": "50 10 0.08 0.1\n100 20 0.06 0.08\n",
+        "pwc": "9 0.8 0.05 0.08\n17 1.5 0.04 0.05\n",
+    }
+    for slug, rows in expected_files.items():
+        content = (data_dir / f"smoothing_evaluation_{slug}.dat").read_text(encoding="utf-8")
+        assert content == "n runtime_ms mean_error l1_error\n" + rows
