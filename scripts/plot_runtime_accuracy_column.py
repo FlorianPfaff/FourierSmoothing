@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Generate the paper's column-width runtime/accuracy summary figure and PGF data."""
+"""Generate the paper's runtime/accuracy figure and shared PGFPlots data."""
 
 from __future__ import annotations
 
@@ -56,7 +56,10 @@ def _read_rows(csv_path: Path) -> list[dict[str, str | int | float]]:
                 {
                     "method": row["method"],
                     "parameter": int(row["parameter"]),
-                    "runtime_s": float(row["runtime_s_mean"]),
+                    "runtime_s_mean": float(row["runtime_s_mean"]),
+                    "runtime_s_median": float(row["runtime_s_median"]),
+                    "runtime_s_q25": float(row["runtime_s_q25"]),
+                    "runtime_s_q75": float(row["runtime_s_q75"]),
                     "mean_error_rad": float(row["mean_error_rad_mean"]),
                     "l1_error": float(row["l1_error_mean"]),
                 }
@@ -72,13 +75,17 @@ def _write_pgfplot_data(
 ) -> list[Path]:
     """Write one shared PGFPlots data file per method.
 
-    The files are consumed by both the representation-size and runtime-tradeoff
-    figures, so the manuscript has one numerical source per method instead of
-    duplicating coordinates in multiple TeX files.
+    Accuracy values are arithmetic means over repetitions. Runtime is represented
+    by its median and interquartile range because the particle timings are
+    right-skewed. The arithmetic runtime mean remains available for audit.
     """
 
     data_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
+    header = (
+        "n runtime_mean_ms runtime_median_ms runtime_q25_ms runtime_q75_ms "
+        "runtime_err_low_ms runtime_err_high_ms mean_error l1_error"
+    )
     for method, slug in PGF_METHOD_SLUGS.items():
         method_rows = sorted(
             (row for row in rows if row["method"] == method),
@@ -87,13 +94,20 @@ def _write_pgfplot_data(
         if not method_rows:
             continue
         path = data_dir / f"smoothing_evaluation_{slug}.dat"
-        lines = ["n runtime_ms mean_error l1_error"]
+        lines = [header]
         for row in method_rows:
+            mean_ms = 1000.0 * float(row["runtime_s_mean"])
+            median_ms, q25_ms, q75_ms, err_low_ms, err_high_ms = _runtime_ms_and_iqr(row)
             lines.append(
                 " ".join(
                     [
                         str(int(row["parameter"])),
-                        _format_data_value(1000.0 * float(row["runtime_s"])),
+                        _format_data_value(mean_ms),
+                        _format_data_value(median_ms),
+                        _format_data_value(q25_ms),
+                        _format_data_value(q75_ms),
+                        _format_data_value(err_low_ms),
+                        _format_data_value(err_high_ms),
                         _format_data_value(float(row["mean_error_rad"])),
                         _format_data_value(float(row["l1_error"])),
                     ]
@@ -125,12 +139,11 @@ def _plot_runtime_accuracy_column(
         method for method in ("FIGFAN", "FIGFDN", "PF", "PWC") if _has_method(rows, method)
     ]
 
-    _draw_metric_by_parameter(
+    _draw_runtime_by_parameter(
         axes[0],
         runtime_rows,
         runtime_methods,
-        metric="runtime_s",
-        ylabel="runtime [ms]",
+        ylabel="median runtime [ms]",
         title="(a) Runtime Scaling",
     )
     _draw_metric_by_runtime(
@@ -165,12 +178,11 @@ def _plot_runtime_accuracy_column(
     return written
 
 
-def _draw_metric_by_parameter(
+def _draw_runtime_by_parameter(
     ax,
     rows: list[dict[str, str | int | float]],
     methods: list[str],
     *,
-    metric: str,
     ylabel: str,
     title: str,
 ) -> None:
@@ -180,8 +192,23 @@ def _draw_metric_by_parameter(
             key=lambda row: row["parameter"],
         )
         parameters = [float(row["parameter"]) for row in method_rows]
-        values = [_metric_plot_value(row, metric) for row in method_rows]
-        ax.plot(parameters, values, label=method, **_method_plot_style(method))
+        medians = []
+        lower_errors = []
+        upper_errors = []
+        for row in method_rows:
+            median_ms, _, _, err_low_ms, err_high_ms = _runtime_ms_and_iqr(row)
+            medians.append(median_ms)
+            lower_errors.append(err_low_ms)
+            upper_errors.append(err_high_ms)
+        ax.errorbar(
+            parameters,
+            medians,
+            yerr=[lower_errors, upper_errors],
+            label=method,
+            capsize=1.5,
+            elinewidth=0.6,
+            **_method_plot_style(method),
+        )
 
     ax.set_xlabel(r"grid points $L$ / particles $N$")
     ax.set_ylabel(ylabel)
@@ -201,23 +228,45 @@ def _draw_metric_by_runtime(
     title: str,
 ) -> None:
     for method in methods:
-        # Parameter order exposes how each method evolves as its representation is
-        # refined. Measured runtime can fluctuate slightly, so a curve may move
-        # left before continuing right; the paper caption states this explicitly.
         method_rows = sorted(
             (row for row in rows if row["method"] == method),
             key=lambda row: row["parameter"],
         )
-        runtimes_ms = [1000.0 * float(row["runtime_s"]) for row in method_rows]
-        values = [float(row[metric]) for row in method_rows]
-        ax.plot(runtimes_ms, values, label=method, **_method_plot_style(method))
+        medians = []
+        lower_errors = []
+        upper_errors = []
+        values = []
+        for row in method_rows:
+            median_ms, _, _, err_low_ms, err_high_ms = _runtime_ms_and_iqr(row)
+            medians.append(median_ms)
+            lower_errors.append(err_low_ms)
+            upper_errors.append(err_high_ms)
+            values.append(float(row[metric]))
+        ax.errorbar(
+            medians,
+            values,
+            xerr=[lower_errors, upper_errors],
+            label=method,
+            capsize=1.5,
+            elinewidth=0.6,
+            **_method_plot_style(method),
+        )
 
-    ax.set_xlabel("runtime [ms]")
+    ax.set_xlabel("median runtime [ms]")
     ax.set_ylabel(ylabel)
     ax.set_title(title, pad=2.5)
     ax.set_xscale("log")
     ax.set_yscale("log")
     _finish_axis(ax)
+
+
+def _runtime_ms_and_iqr(
+    row: dict[str, str | int | float],
+) -> tuple[float, float, float, float, float]:
+    median_ms = 1000.0 * float(row["runtime_s_median"])
+    q25_ms = 1000.0 * float(row["runtime_s_q25"])
+    q75_ms = 1000.0 * float(row["runtime_s_q75"])
+    return median_ms, q25_ms, q75_ms, median_ms - q25_ms, q75_ms - median_ms
 
 
 def _finish_axis(ax) -> None:
@@ -240,11 +289,6 @@ def _runtime_parameter_rows(
             copied["method"] = "FIGF"
         runtime_rows.append(copied)
     return runtime_rows
-
-
-def _metric_plot_value(row: dict[str, str | int | float], metric: str) -> float:
-    value = float(row[metric])
-    return 1000.0 * value if metric == "runtime_s" else value
 
 
 def _has_method(rows: list[dict[str, str | int | float]], method: str) -> bool:
