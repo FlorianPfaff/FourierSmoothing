@@ -154,12 +154,14 @@ def test_write_latex_tables_from_known_result_csvs(tmp_path):
         assert "\\begin{tabular}" in content
         assert "\\toprule" in content
         assert "\\bottomrule" in content
-    assert "fourier\\_identity\\_truncated\\_convolution" in (tables_dir / TABLE_FILENAMES["identity"]).read_text(
-        encoding="utf-8"
-    )
+    identity_content = (tables_dir / TABLE_FILENAMES["identity"]).read_text(encoding="utf-8")
+    assert "fourier\\_identity\\_truncated\\_convolution" in identity_content
+    assert "Method & Grid Size & Runtime [s] & Max. Diff. & Norm. Err." in identity_content
     smoothing_content = (tables_dir / TABLE_FILENAMES["smoothing"]).read_text(encoding="utf-8")
+    assert "Method & Parameter & Runtime [s] & Mean Err. [rad] & $L^1$ Err." in smoothing_content
     assert "0.004" in smoothing_content
     assert "9.9" not in smoothing_content
     gain_table = (tables_dir / TABLE_FILENAMES["smoothing_gain"]).read_text(encoding="utf-8")
     assert "trial-bootstrap 95\\% CI" in gain_table
-    assert "50.0 [45.0, 55.0]\\%" in gain_table
+    assert "50.0 [45.0, 55.0]" in gain_table
+    assert "55.0]\\%" not in gain_table
