@@ -133,6 +133,18 @@ def main() -> None:
             ],
             repository_root,
         )
+        if (results_dir / "smoothing_evaluation_summary.csv").exists():
+            _run(
+                [
+                    sys.executable,
+                    "scripts/plot_runtime_accuracy_column.py",
+                    "--results-dir",
+                    str(results_dir),
+                    "--figures-dir",
+                    str(figures_dir),
+                ],
+                repository_root,
+            )
     if not args.skip_hero:
         _run(
             [
