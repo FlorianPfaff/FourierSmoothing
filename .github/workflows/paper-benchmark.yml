@@ -76,6 +76,9 @@ jobs:
           python scripts/plot_paper_results.py \
             --results-dir paper_benchmark/results \
             --figures-dir paper_benchmark/figures
+          python scripts/plot_runtime_accuracy_column.py \
+            --results-dir paper_benchmark/results \
+            --figures-dir paper_benchmark/figures
           python scripts/write_latex_tables.py \
             --results-dir paper_benchmark/results \
             --tables-dir paper_benchmark/tables
