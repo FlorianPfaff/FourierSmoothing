@@ -1,0 +1,76 @@
+{
+  "schema_version": 2,
+  "evaluation_mode": "corrected_errors_with_reused_controlled_timings",
+  "configuration": {
+    "figf_grid_sizes": [15, 31, 63, 127, 255, 511, 1023, 2047, 4095],
+    "pwc_grid_sizes": [15, 31, 63, 127, 255, 511, 1023, 2047, 4095],
+    "pf_particle_counts": [100, 300, 1000, 3000, 10000],
+    "time_steps": 9,
+    "repetitions": 30,
+    "likelihood_sharpness": 5.0,
+    "noise_concentration": 4.0,
+    "l1_reference_grid_size": 65535,
+    "mean_reference_particles": 1000000,
+    "mean_reference_repetitions": 3,
+    "particle_kde_bandwidth_scale": 1.0,
+    "pwc_quadrature_points": 8,
+    "seed": 1
+  },
+  "error_generation": {
+    "host": "runnervmvrwv9",
+    "generated_at_utc": "2026-07-27T10:48:02Z",
+    "workflow": "Corrected smoothing evidence",
+    "implementation_tested_commit": "41f8012b2ab9bfdc2ffecb7fa5937dc23b2a9252",
+    "implementation_merged_commit": "2b655ce6c2161fcd1f20856c0c21db13bb6b8d78",
+    "repetitions": 30,
+    "seed": 1,
+    "generated_columns": [
+      "mean_error_rad",
+      "max_mean_error_rad",
+      "l1_error",
+      "max_l1_error",
+      "min_evaluated_density",
+      "max_normalization_error"
+    ]
+  },
+  "timing_generation": {
+    "host": "workstation2",
+    "started_at_utc": "2026-07-17T01:13:30.488725+00:00",
+    "finished_at_utc": "2026-07-17T01:13:35.986738+00:00",
+    "duration_s": 5.498013,
+    "implementation_git_commit": "dec15c12a8361fe02519a0c655f2ca5fe3cd30f7",
+    "source_tree_sha256": "91e2b03371a54e2cb84468da29a74e4fa48e8711c989aa2768c7a648c1145282",
+    "platform": "Linux-6.17.0-23-generic-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "logical_cpus": 64,
+    "python_executable": "/usr/bin/python3",
+    "python_version": "3.12.3",
+    "numpy_version": "2.0.2",
+    "pyrecest_available": true,
+    "load_average_before": [0.6064453125, 0.9619140625, 3.95654296875],
+    "load_average_after": [0.71826171875, 0.9794921875, 3.94580078125],
+    "generated_columns": ["runtime_s"]
+  },
+  "runtime_scope": {
+    "included": ["forward filter", "backward smoother"],
+    "excluded": [
+      "reference generation",
+      "transition-kernel construction",
+      "likelihood cell projection",
+      "dense FIGF interpolation",
+      "PWC densification",
+      "particle KDE reconstruction"
+    ]
+  },
+  "combined_raw_data": {
+    "path": "results/smoothing_evaluation_raw.csv",
+    "git_commit": "9afe8d724519faa5ab1c7bb84a51b2fa0179530f",
+    "git_blob_sha1": "43e57c864d516a5f33cffec6e7b8d0038d02a678",
+    "join_key": ["method", "parameter", "repetition"],
+    "assembly": "Corrected error columns and retained timing columns were joined after exact key equality was verified."
+  },
+  "public_evidence": {
+    "repository": "FlorianPfaff/FourierSmoothing",
+    "path": "paper_evidence"
+  }
+}
