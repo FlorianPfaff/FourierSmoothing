@@ -85,7 +85,7 @@ def _identity_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="lrrrr",
-        header=["method", "grid size", "runtime [s]", "max diff.", "norm. err."],
+        header=["Method", "Grid Size", "Runtime [s]", "Max. Diff.", "Norm. Err."],
         rows=body,
         caption_comment="Identity-torus smoother benchmark summary.",
     )
@@ -110,7 +110,7 @@ def _negativity_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="rrrrr",
-        header=["sharpness", "coeffs", "neg. mass", "max undershoot", "$L^1$ err."],
+        header=["Sharpness", "Coeffs.", "Neg. Mass", "Max. Undershoot", "$L^1$ Err."],
         rows=body,
         caption_comment="Truncation-induced negativity diagnostic summary.",
     )
@@ -135,7 +135,7 @@ def _particle_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="rrrrr",
-        header=["particles", "trajectories", "runtime [s]", "mean err. [rad]", "max err. [rad]"],
+        header=["Particles", "Trajectories", "Runtime [s]", "Mean Err. [rad]", "Max. Err. [rad]"],
         rows=body,
         caption_comment="Particle smoother baseline summary.",
     )
@@ -160,7 +160,7 @@ def _figf_pwc_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="lrrrr",
-        header=["method", "grid size", "runtime [s]", "mean $L^1$", "max $L^1$"],
+        header=["Method", "Grid Size", "Runtime [s]", "Mean $L^1$", "Max. $L^1$"],
         rows=body,
         caption_comment="FIGF/PWC reconstruction benchmark summary.",
     )
@@ -180,7 +180,7 @@ def _smoothing_summary_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="lrrrr",
-        header=["method", "parameter", "runtime [s]", "mean err. [rad]", "$L^1$ err."],
+        header=["Method", "Parameter", "Runtime [s]", "Mean Err. [rad]", "$L^1$ Err."],
         rows=body,
         caption_comment="Main smoothing evaluation summary.",
     )
@@ -205,7 +205,7 @@ def _smoothing_raw_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="lrrrr",
-        header=["method", "parameter", "runtime [s]", "mean err. [rad]", "$L^1$ err."],
+        header=["Method", "Parameter", "Runtime [s]", "Mean Err. [rad]", "$L^1$ Err."],
         rows=body,
         caption_comment="Main smoothing evaluation summary generated from raw repetitions.",
     )
@@ -230,7 +230,7 @@ def _smoothing_gain_table(rows: Sequence[Mapping[str, str]]) -> str:
                 labels.get(row["horizon"], _latex_escape(row["horizon"])),
                 f"{float(row['filter_mae_rad']):.3f}",
                 f"{float(row['smoother_mae_rad']):.3f}",
-                f"{reduction:.1f} [{ci_low:.1f}, {ci_high:.1f}]\\%",
+                f"{reduction:.1f} [{ci_low:.1f}, {ci_high:.1f}]",
             ]
         )
 
@@ -245,10 +245,10 @@ def _smoothing_gain_table(rows: Sequence[Mapping[str, str]]) -> str:
         r"\label{tab:smoothing-gain}",
         r"\begin{tabular}{lrrr}",
         r"\toprule",
-        "Horizon & Filter [rad] & Smoother [rad] & Reduction [\\%] \\\\",
+        "Horizon & Filter [rad] & Smoother [rad] & Reduction [\\%] \\\",
         r"\midrule",
     ]
-    lines.extend(" & ".join(row) + " \\\\" for row in body)
+    lines.extend(" & ".join(row) + " \\\" for row in body)
     lines.extend([r"\bottomrule", r"\end{tabular}", r"\end{table}", ""])
     return "\n".join(lines)
 
@@ -258,7 +258,7 @@ def _tabular(*, columns: str, header: Sequence[str], rows: Sequence[Sequence[str
         f"% {caption_comment}",
         f"\\begin{{tabular}}{{{columns}}}",
         "\\toprule",
-        " & ".join(header) + r" \\",
+        " & ".join(header) + r" \",
         "\\midrule",
     ]
     lines.extend(" & ".join(row) + r" \\" for row in rows)
