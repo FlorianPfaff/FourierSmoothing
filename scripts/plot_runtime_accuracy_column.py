@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Generate the paper's column-width runtime/accuracy summary figure."""
+"""Generate the paper's column-width runtime/accuracy summary figure and PGF data."""
 
 from __future__ import annotations
 
@@ -8,6 +8,12 @@ import csv
 from pathlib import Path
 
 COLUMN_WIDTH_IN = 3.45
+PGF_METHOD_SLUGS = {
+    "FIGFAN": "figfan",
+    "FIGFDN": "figfdn",
+    "PF": "pf",
+    "PWC": "pwc",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,6 +38,8 @@ def main() -> None:
     rows = _read_rows(csv_path)
     args.figures_dir.mkdir(parents=True, exist_ok=True)
 
+    for path in _write_pgfplot_data(rows, args.figures_dir / "data"):
+        print(path)
     for path in _plot_runtime_accuracy_column(
         rows,
         args.figures_dir / "smoothing_runtime_accuracy_column",
@@ -56,6 +64,49 @@ def _read_rows(csv_path: Path) -> list[dict[str, str | int | float]]:
     if not rows:
         raise ValueError(f"No smoothing-evaluation rows found in {csv_path}")
     return rows
+
+
+def _write_pgfplot_data(
+    rows: list[dict[str, str | int | float]],
+    data_dir: Path,
+) -> list[Path]:
+    """Write one shared PGFPlots data file per method.
+
+    The files are consumed by both the representation-size and runtime-tradeoff
+    figures, so the manuscript has one numerical source per method instead of
+    duplicating coordinates in multiple TeX files.
+    """
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    for method, slug in PGF_METHOD_SLUGS.items():
+        method_rows = sorted(
+            (row for row in rows if row["method"] == method),
+            key=lambda row: row["parameter"],
+        )
+        if not method_rows:
+            continue
+        path = data_dir / f"smoothing_evaluation_{slug}.dat"
+        lines = ["n runtime_ms mean_error l1_error"]
+        for row in method_rows:
+            lines.append(
+                " ".join(
+                    [
+                        str(int(row["parameter"])),
+                        _format_data_value(1000.0 * float(row["runtime_s"])),
+                        _format_data_value(float(row["mean_error_rad"])),
+                        _format_data_value(float(row["l1_error"])),
+                    ]
+                )
+            )
+        with path.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write("\n".join(lines) + "\n")
+        written.append(path)
+    return written
+
+
+def _format_data_value(value: float) -> str:
+    return f"{value:.12g}"
 
 
 def _plot_runtime_accuracy_column(
