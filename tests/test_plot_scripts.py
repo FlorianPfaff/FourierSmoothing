@@ -75,6 +75,7 @@ def test_plot_paper_results_script_generates_figures(tmp_path):
         check=True,
     )
 
+    assert (figures_dir / "smoothing_accuracy_by_parameter.png").exists()
     assert (figures_dir / "smoothing_mean_error_by_parameter.png").exists()
     assert (figures_dir / "smoothing_l1_error_by_parameter.png").exists()
     assert (figures_dir / "smoothing_runtime_by_parameter.png").exists()

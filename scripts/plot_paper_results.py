@@ -10,6 +10,11 @@ from pathlib import Path
 from statistics import mean
 
 
+TEX_PT_PER_IN = 72.27
+IEEE_TEXTWIDTH_PT = 516.0
+FULL_WIDTH_FIGURE_IN = IEEE_TEXTWIDTH_PT / TEX_PT_PER_IN
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", type=Path, default=Path("../2026-07-FourierSmoothing-Paper/results"))
@@ -73,6 +78,14 @@ def _plot_smoothing_evaluation(csv_path: Path, figures_dir: Path, formats: list[
     methods = [method for method in method_order if any(row["method"] == method for row in rows)]
     written = []
 
+    written.extend(
+        _plot_accuracy_by_parameter(
+            rows,
+            methods,
+            figures_dir / "smoothing_accuracy_by_parameter",
+            formats,
+        )
+    )
     written.extend(
         _plot_metric_by_parameter(
             rows,
@@ -164,7 +177,83 @@ def _plot_metric_by_parameter(
     return written
 
 
-def _draw_metric_by_parameter(ax, rows, methods, *, metric: str, ylabel: str, title: str, log_y: bool) -> None:
+def _plot_accuracy_by_parameter(
+    rows: list[dict[str, str | int | float]],
+    methods: list[str],
+    output_base: Path,
+    formats: list[str],
+) -> list[Path]:
+    import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
+
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_WIDTH_FIGURE_IN, 2.35), sharex=True)
+    _draw_metric_by_parameter(
+        axes[0],
+        rows,
+        methods,
+        metric="mean_error_rad",
+        ylabel="mean-direction error [rad]",
+        title=None,
+        log_y=True,
+        show_legend=False,
+        linewidth=1.25,
+    )
+    _draw_metric_by_parameter(
+        axes[1],
+        rows,
+        methods,
+        metric="l1_error",
+        ylabel=r"mean $L^1$ error",
+        title=None,
+        log_y=True,
+        show_legend=False,
+        linewidth=1.25,
+    )
+
+    axes[1].yaxis.tick_right()
+    axes[1].yaxis.set_label_position("right")
+    axes[1].tick_params(axis="y", labelleft=False, labelright=True)
+    for ax in axes:
+        for spine in ax.spines.values():
+            spine.set_linewidth(0.8)
+        ax.tick_params(axis="both", which="major", length=3.0, width=0.8, pad=1.5)
+        ax.tick_params(axis="both", which="minor", length=1.8, width=0.65)
+
+    fig.subplots_adjust(left=0.075, right=0.925, top=0.97, bottom=0.39, wspace=0.18)
+    fig.text(0.285, 0.175, "(a) Mean-direction error", ha="center", va="center", fontsize=7.2)
+    fig.text(0.715, 0.175, r"(b) $L^1$ density error", ha="center", va="center", fontsize=7.2)
+
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.045),
+        ncol=len(methods),
+        fontsize=7,
+        framealpha=0.88,
+        borderpad=0.25,
+        labelspacing=0.22,
+        handlelength=2.0,
+        handletextpad=0.4,
+        columnspacing=0.9,
+    )
+    written = _save_all(fig, output_base, formats)
+    plt.close(fig)
+    return written
+
+
+def _draw_metric_by_parameter(
+    ax,
+    rows,
+    methods,
+    *,
+    metric: str,
+    ylabel: str,
+    title: str | None,
+    log_y: bool,
+    show_legend: bool = True,
+    linewidth: float | None = None,
+) -> None:
     import numpy as np  # pylint: disable=import-outside-toplevel
 
     for method in methods:
@@ -173,6 +262,9 @@ def _draw_metric_by_parameter(ax, rows, methods, *, metric: str, ylabel: str, ti
         values = np.asarray([_metric_plot_value(row, metric) for row in method_rows], dtype=float)
         deviations = np.asarray([_metric_plot_deviation(row, metric) for row in method_rows], dtype=float)
         deviations = np.minimum(deviations, 0.8 * values)
+        style = _method_plot_style(method)
+        if linewidth is not None:
+            style["linewidth"] = linewidth
         ax.errorbar(
             parameters,
             values,
@@ -180,11 +272,12 @@ def _draw_metric_by_parameter(ax, rows, methods, *, metric: str, ylabel: str, ti
             label=method,
             capsize=1.5,
             elinewidth=0.65,
-            **_method_plot_style(method),
+            **style,
         )
     ax.set_xlabel(r"grid points $L$ / particles $N$")
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    if title:
+        ax.set_title(title)
     ax.set_xscale("log")
     if log_y and all(row[metric] > 0.0 for row in rows):
         ax.set_yscale("log")
@@ -192,7 +285,8 @@ def _draw_metric_by_parameter(ax, rows, methods, *, metric: str, ylabel: str, ti
             ax.yaxis.set_major_locator(_runtime_log_locator())
             ax.yaxis.set_major_formatter(_plain_number_formatter())
             ax.yaxis.set_minor_formatter(_blank_formatter())
-    ax.legend(frameon=True, framealpha=0.9)
+    if show_legend:
+        ax.legend(frameon=True, framealpha=0.9)
     ax.grid(True, which="major", color="#B8B8B8", linewidth=0.45, alpha=0.65)
 
 
