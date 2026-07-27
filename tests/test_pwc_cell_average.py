@@ -27,7 +27,8 @@ def test_pwc_likelihood_projection_is_normalized_and_converged():
 
     cell_width = 2.0 * np.pi / 15
     np.testing.assert_allclose(np.sum(projected, axis=1) * cell_width, 1.0, atol=1.0e-14)
-    np.testing.assert_allclose(projected, reference, rtol=6.0e-4, atol=2.0e-6)
+    assert np.max(np.abs(projected - reference)) < 1.3e-4
+    assert np.max(np.sum(np.abs(projected - reference), axis=1) * cell_width) < 5.0e-4
 
 
 def test_pwc_cell_average_is_not_midpoint_collocation_on_coarse_grid():
