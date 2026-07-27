@@ -2,7 +2,7 @@
 
 Experimental reference implementation of fixed-interval smoothing for Fourier/grid filters on hypertori.
 
-This repository is for **code**: Python package code, experiment scripts, tests, and reusable numerical utilities. Manuscript files, committed figures, and generated result tables belong in the separate `FlorianPfaff/2026-07-FourierSmoothing-Paper` repository.
+This repository is for **code**: Python package code, experiment scripts, tests, and reusable numerical utilities. Manuscript files and publication-layout sources belong in the separate `FlorianPfaff/2026-07-FourierSmoothing-Paper` repository. A public snapshot of every plotted benchmark point, the smoothing-gain summary, and split provenance metadata is retained under `paper_evidence/`.
 
 The current implementation focuses on the backward-information smoother
 
@@ -85,7 +85,7 @@ python scripts/run_smoothing_evaluation.py --output-dir ../2026-07-FourierSmooth
 python scripts/run_smoothing_error_reduction.py --output-dir ../2026-07-FourierSmoothing-Paper/results
 ```
 
-The main benchmark writes `smoothing_evaluation_raw.csv`, `smoothing_evaluation_summary.csv`, and `smoothing_evaluation_metadata.json`. It compares FIGFAN, FIGFDN, PWC, and a bootstrap-PF/FFBSi smoother by mean-direction error, $L^1$ density error, runtime, and error over runtime over 30 repetitions. The mean reference aggregates three independent FFBSi runs with one million particles and trajectories each. The density reference is a PWC smoother with 65,535 cells. Particle marginals are converted to continuous densities with a wrapped-normal KDE using bandwidth $N^{-1/5}$. The summary uses `pyrecest.evaluation.summarize_parameter_sweep_records` when PyRecEst is on `PYTHONPATH`; the repository contains an equivalent fallback so its smoke pipeline remains self-contained.
+The main benchmark writes `smoothing_evaluation_raw.csv`, `smoothing_evaluation_summary.csv`, and `smoothing_evaluation_metadata.json`. It compares FIGFAN, FIGFDN, PWC, and a bootstrap-PF/FFBSi smoother by mean-direction error, $L^1$ density error, runtime, and error over runtime over 30 repetitions. Accuracy summaries use arithmetic means. Runtime summaries retain the mean, median, standard deviation, and quartiles; paper plots use the median with an interquartile interval because particle-smoother timings are right-skewed. The mean reference aggregates three independent FFBSi runs with one million particles and trajectories each. The density reference is a PWC smoother with 65,535 cells. Particle marginals are converted to continuous densities with a wrapped-normal KDE using bandwidth $N^{-1/5}$. The summary uses `pyrecest.evaluation.summarize_parameter_sweep_records` when PyRecEst is on `PYTHONPATH`; the repository contains an equivalent fallback so its smoke pipeline remains self-contained.
 
 Accuracy generation can be separated from controlled timing. Given a compatible raw CSV whose `(method, parameter, repetition)` keys match the requested sweep, `--reuse-error-raw` skips references, interpolation, densification, and KDE reconstruction; it reruns only the forward filters and backward smoothers and replaces every runtime. For example, errors may be generated on `gpuserver4090` and timed on an idle `gpuserver6000` via:
 
@@ -99,7 +99,7 @@ python scripts/run_smoothing_evaluation.py \
 
 The smoothing-gain command writes `smoothing_gain_raw.csv` and `smoothing_gain_summary.csv`. It compares filtered and smoothed circular means with simulated latent states over 500 sequences and reports a trial-bootstrap confidence interval. It deliberately makes no filter-to-smoother $L^1$ reduction claim because filtering and smoothing target different posterior densities.
 
-Runtime covers the forward filter and backward smoother. Dense FIGF interpolation, PWC evaluation, PF KDE reconstruction, transition-kernel construction, and reference generation are excluded. Thus FIGFAN and FIGFDN share one runtime curve. Paper timing values must be measured on `gpuserver6000` while the server is idle. The metadata sidecar records the host, load averages, software versions, git revision, source-tree hash, full configuration, and timing scope. A staged source tree without `.git` can supply the revision through `FOURIER_SMOOTHING_GIT_COMMIT`.
+Runtime covers the forward filter and backward smoother. Dense FIGF interpolation, PWC evaluation, PF KDE reconstruction, transition-kernel construction, and reference generation are excluded. Thus FIGFAN and FIGFDN share one runtime distribution. Paper timing values must be measured on the designated idle host. The metadata sidecar records the timing and error-generation sources separately, together with software versions, code revisions, source-tree identifiers, the full configuration, and the timing scope. A staged source tree without `.git` can supply the revision through `FOURIER_SMOOTHING_GIT_COMMIT`.
 
 Additional diagnostics are still available:
 
