@@ -13,16 +13,22 @@ on:
         required: true
         default: '1'
         type: string
+  pull_request:
+    branches: [main]
 
 concurrency:
-  group: paper-benchmark-gpuserver6000
+  group: paper-benchmark-gpuserver6000-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
   benchmark:
     name: Final accuracy-runtime benchmark
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/fix-paper-review-issues'
     runs-on: [self-hosted, Linux, X64, gpuserver6000]
     timeout-minutes: 360
+    env:
+      BENCHMARK_REPETITIONS: ${{ inputs.repetitions || '30' }}
+      BENCHMARK_SEED: ${{ inputs.seed || '1' }}
 
     steps:
       - name: Check out repository
@@ -68,8 +74,8 @@ jobs:
         run: |
           python scripts/run_smoothing_evaluation.py \
             --output-dir paper_benchmark/results \
-            --repetitions '${{ inputs.repetitions }}' \
-            --seed '${{ inputs.seed }}'
+            --repetitions "${BENCHMARK_REPETITIONS}" \
+            --seed "${BENCHMARK_SEED}"
 
       - name: Generate benchmark figures and table
         run: |
