@@ -1,8 +1,8 @@
 name: Publish final paper evidence
 
 on:
-  push:
-    branches: [agent/final-paper-hardening]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/agent/final-paper-hardening'
+    if: github.head_ref == 'agent/final-paper-hardening'
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
