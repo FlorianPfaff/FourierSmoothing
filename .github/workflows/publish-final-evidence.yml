@@ -1,0 +1,198 @@
+name: Publish final paper evidence
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-final-paper-evidence
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: github.head_ref == 'agent/final-paper-hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/final-paper-hardening
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[paper]'
+
+      - name: Generate accuracy, gain, reference, and adjoint evidence
+        run: |
+          rm -rf generated_final_evidence
+          mkdir -p generated_final_evidence/evaluation generated_final_evidence/gain generated_final_evidence/diagnostics
+          python scripts/run_smoothing_evaluation.py \
+            --output-dir generated_final_evidence/evaluation \
+            --repetitions 30 \
+            --seed 1
+          python scripts/run_smoothing_error_reduction.py \
+            --output-dir generated_final_evidence/gain
+          python scripts/run_reference_diagnostics.py \
+            --output-dir generated_final_evidence/diagnostics
+          python scripts/run_adjoint_validation.py \
+            --output-dir generated_final_evidence/diagnostics
+
+      - name: Assemble public snapshot while retaining controlled timing summaries
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import csv
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path('.')
+          evidence = root / 'paper_evidence'
+          generated = root / 'generated_final_evidence'
+          evidence.mkdir(exist_ok=True)
+
+          with (generated / 'evaluation/smoothing_evaluation_raw.csv').open(newline='', encoding='utf-8') as handle:
+              raw_rows = list(csv.DictReader(handle))
+          accuracy_fields = [
+              'method', 'parameter', 'repetition',
+              'mean_error_rad', 'max_mean_error_rad',
+              'l1_error', 'max_l1_error',
+              'min_evaluated_density', 'max_normalization_error',
+          ]
+          with (evidence / 'smoothing_accuracy_raw.csv').open('w', newline='', encoding='utf-8') as handle:
+              writer = csv.DictWriter(handle, fieldnames=accuracy_fields, lineterminator='\n')
+              writer.writeheader()
+              for row in raw_rows:
+                  writer.writerow({field: row[field] for field in accuracy_fields})
+
+          with (generated / 'evaluation/smoothing_evaluation_summary.csv').open(newline='', encoding='utf-8') as handle:
+              summary_rows = list(csv.DictReader(handle))
+          accuracy_summary_fields = [
+              field for field in summary_rows[0]
+              if not field.startswith('runtime_s_')
+          ]
+          with (evidence / 'smoothing_accuracy_summary.csv').open('w', newline='', encoding='utf-8') as handle:
+              writer = csv.DictWriter(handle, fieldnames=accuracy_summary_fields, lineterminator='\n')
+              writer.writeheader()
+              for row in summary_rows:
+                  writer.writerow({field: row[field] for field in accuracy_summary_fields})
+
+          summary_by_key = {
+              (row['method'], int(row['parameter'])): row
+              for row in summary_rows
+          }
+          slugs = {'FIGFAN': 'figfan', 'FIGFDN': 'figfdn', 'PF': 'pf', 'PWC': 'pwc'}
+          old_header = [
+              'n', 'runtime_mean_ms', 'runtime_median_ms', 'runtime_q25_ms',
+              'runtime_q75_ms', 'runtime_err_low_ms', 'runtime_err_high_ms',
+              'mean_error', 'l1_error',
+          ]
+          new_header = [
+              'n', 'runtime_mean_ms', 'runtime_median_ms', 'runtime_q25_ms',
+              'runtime_q75_ms', 'runtime_err_low_ms', 'runtime_err_high_ms',
+              'mean_error', 'mean_error_q25', 'mean_error_q75',
+              'mean_error_err_low', 'mean_error_err_high',
+              'l1_error', 'l1_error_q25', 'l1_error_q75',
+              'l1_error_err_low', 'l1_error_err_high',
+          ]
+          for method, slug in slugs.items():
+              path = evidence / f'smoothing_evaluation_{slug}.dat'
+              with path.open(newline='', encoding='utf-8') as handle:
+                  reader = csv.DictReader(handle, delimiter=' ', skipinitialspace=True)
+                  if reader.fieldnames != old_header:
+                      raise RuntimeError(f'unexpected controlled timing data schema in {path}: {reader.fieldnames}')
+                  controlled = list(reader)
+              lines = [' '.join(new_header)]
+              for row in controlled:
+                  summary = summary_by_key[(method, int(row['n']))]
+                  mean_error = float(summary['mean_error_rad_mean'])
+                  mean_q25 = float(summary['mean_error_rad_q25'])
+                  mean_q75 = float(summary['mean_error_rad_q75'])
+                  l1_error = float(summary['l1_error_mean'])
+                  l1_q25 = float(summary['l1_error_q25'])
+                  l1_q75 = float(summary['l1_error_q75'])
+                  values = [
+                      row['n'], row['runtime_mean_ms'], row['runtime_median_ms'],
+                      row['runtime_q25_ms'], row['runtime_q75_ms'],
+                      row['runtime_err_low_ms'], row['runtime_err_high_ms'],
+                      f'{mean_error:.12g}', f'{mean_q25:.12g}', f'{mean_q75:.12g}',
+                      f'{mean_error - mean_q25:.12g}', f'{mean_q75 - mean_error:.12g}',
+                      f'{l1_error:.12g}', f'{l1_q25:.12g}', f'{l1_q75:.12g}',
+                      f'{l1_error - l1_q25:.12g}', f'{l1_q75 - l1_error:.12g}',
+                  ]
+                  lines.append(' '.join(values))
+              path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+          for source, target in (
+              (generated / 'gain/smoothing_gain_raw.csv', evidence / 'smoothing_gain_raw.csv'),
+              (generated / 'gain/smoothing_gain_summary.csv', evidence / 'smoothing_gain_summary.csv'),
+              (generated / 'diagnostics/reference_first_moments.csv', evidence / 'reference_first_moments.csv'),
+              (generated / 'diagnostics/reference_stability.json', evidence / 'reference_stability.json'),
+              (generated / 'diagnostics/adjoint_validation.csv', evidence / 'adjoint_validation.csv'),
+              (generated / 'evaluation/smoothing_evaluation_metadata.json', evidence / 'accuracy_regeneration_environment.json'),
+          ):
+              target.write_bytes(source.read_bytes())
+
+          metadata_path = evidence / 'smoothing_evaluation_metadata.json'
+          metadata = json.loads(metadata_path.read_text(encoding='utf-8'))
+          metadata['schema_version'] = 3
+          metadata['public_evidence'].update({
+              'accuracy_raw': 'paper_evidence/smoothing_accuracy_raw.csv',
+              'accuracy_summary': 'paper_evidence/smoothing_accuracy_summary.csv',
+              'accuracy_regeneration_environment': 'paper_evidence/accuracy_regeneration_environment.json',
+              'gain_raw': 'paper_evidence/smoothing_gain_raw.csv',
+              'gain_summary': 'paper_evidence/smoothing_gain_summary.csv',
+              'reference_first_moments': 'paper_evidence/reference_first_moments.csv',
+              'reference_stability': 'paper_evidence/reference_stability.json',
+              'adjoint_validation': 'paper_evidence/adjoint_validation.csv',
+          })
+          metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+
+          readme = '''# Public evidence snapshot for the FIGF smoothing paper
+
+This directory is the public numerical-evidence snapshot referenced by the manuscript *Fixed-Interval Smoothing with the Fourier-Interpreted Grid Filter*.
+
+It contains:
+
+- one generated PGFPlots data file per evaluated method, including controlled runtime mean, median, quartiles and IQR errors, plus mean-direction and $L^1$ accuracy means and quartiles;
+- `smoothing_accuracy_raw.csv`, the complete 30-repetition accuracy rows with runtime removed to avoid mixing hosted-runner timings with the controlled timing study;
+- `smoothing_accuracy_summary.csv` and `accuracy_regeneration_environment.json`;
+- complete raw and summarized 500-sequence filtering-versus-smoothing state-error results;
+- the three high-sample reference first-moment sequences and a 65,535-versus-131,071-cell reference-refinement diagnostic;
+- weighted-adjoint validation for two-dimensional additive and one-dimensional nonadditive transitions;
+- split provenance metadata for the corrected errors and retained controlled timings.
+
+The exact per-repetition controlled timing rows were produced on the designated timing host and remain identified by their Git blob in the manuscript repository. Every timing value used in the paper—mean, median, quartiles and IQR errors—is reproduced in the public method data files. Accuracy and state-error raw rows are fully public here.
+
+Accuracy values are arithmetic means over repetitions. Runtime plots use the median with the first and third quartiles because PF/FFBSi timings are right-skewed. PF accuracy intervals use the corresponding accuracy quartiles.
+'''
+          (evidence / 'README.md').write_text(readme, encoding='utf-8')
+
+          manifest_lines = []
+          for path in sorted(evidence.iterdir()):
+              if path.is_file() and path.name != 'SHA256SUMS':
+                  manifest_lines.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}")
+          (evidence / 'SHA256SUMS').write_text('\n'.join(manifest_lines) + '\n', encoding='utf-8')
+          PY
+
+      - name: Remove one-shot workflow and commit evidence
+        run: |
+          rm .github/workflows/publish-final-evidence.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'Publish complete paper evidence and diagnostics'
+          git push origin HEAD:agent/final-paper-hardening
