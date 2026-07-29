@@ -16,6 +16,7 @@ from typing import Iterable, Sequence
 import numpy as np
 from numpy.typing import NDArray
 
+from .nonnegative import clip_roundoff_nonnegative
 from .particle import (
     bootstrap_von_mises_particle_filter_1d,
     ffbsi_von_mises_particle_smoother_1d,
@@ -1167,7 +1168,7 @@ def _pwc_forward_predict_fft(
     cell_volume: float,
 ) -> NDArray[np.float64]:
     predicted = np.fft.ifft(np.fft.fft(kernel) * np.fft.fft(density)).real
-    return normalize_grid_density(np.maximum(predicted * cell_volume, 0.0), cell_volume)
+    return normalize_grid_density(clip_roundoff_nonnegative(predicted * cell_volume, "PWC forward prediction"), cell_volume)
 
 
 def _pwc_backward_predict_fft(
@@ -1176,7 +1177,7 @@ def _pwc_backward_predict_fft(
     cell_volume: float,
 ) -> NDArray[np.float64]:
     predicted = np.fft.ifft(np.conj(np.fft.fft(kernel)) * np.fft.fft(message)).real
-    return np.maximum(predicted * cell_volume, 0.0)
+    return clip_roundoff_nonnegative(predicted * cell_volume, "PWC backward prediction")
 
 
 def _forward_predict_additive_fft(
@@ -1185,7 +1186,7 @@ def _forward_predict_additive_fft(
     cell_volume: float,
 ) -> NDArray[np.float64]:
     predicted = np.fft.ifftn(np.fft.fftn(noise) * np.fft.fftn(density)).real
-    return normalize_grid_density(np.maximum(predicted * cell_volume, 0.0), cell_volume)
+    return normalize_grid_density(clip_roundoff_nonnegative(predicted * cell_volume, "FIGF forward prediction"), cell_volume)
 
 
 def _evaluate_figfan_1d(smoothed: NDArray[np.float64], evaluation_grid_size: int) -> NDArray[np.float64]:
@@ -1201,7 +1202,7 @@ def _evaluate_figfdn_1d(smoothed: NDArray[np.float64], evaluation_grid_size: int
     cell_volume = cell_volume_for_grid(grid_shape)
     evaluated = []
     for values in smoothed:
-        sqrt_values = np.sqrt(np.maximum(values, 0.0))
+        sqrt_values = np.sqrt(clip_roundoff_nonnegative(values, "smoothed grid density"))
         dense_sqrt = fourier_to_grid(grid_to_fourier(sqrt_values), grid_shape=grid_shape)
         dense_values = dense_sqrt**2
         evaluated.append(dense_values / (np.sum(dense_values) * cell_volume))
@@ -1371,7 +1372,7 @@ def _particle_trajectories_to_wrapped_normal_kde_1d(
         masses += np.bincount((left + 1) % grid_size, weights=fraction, minlength=grid_size)
         binned_density = masses / (n_trajectories * cell_volume)
         density = np.fft.ifft(np.fft.fft(binned_density) * kernel_multiplier).real
-        densities[t] = normalize_grid_density(np.maximum(density, 0.0), cell_volume)
+        densities[t] = normalize_grid_density(clip_roundoff_nonnegative(density, "particle KDE density"), cell_volume)
     return densities
 
 

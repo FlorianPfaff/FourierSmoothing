@@ -1,0 +1,120 @@
+{
+  "configuration": {
+    "figf_grid_sizes": [
+      15,
+      31,
+      63,
+      127,
+      255,
+      511,
+      1023,
+      2047,
+      4095
+    ],
+    "l1_reference_grid_size": 65535,
+    "likelihood_sharpness": 5.0,
+    "mean_reference_particles": 1000000,
+    "mean_reference_repetitions": 3,
+    "noise_concentration": 4.0,
+    "particle_kde_bandwidth_scale": 1.0,
+    "pf_particle_counts": [
+      100,
+      300,
+      1000,
+      3000,
+      10000
+    ],
+    "pwc_grid_sizes": [
+      15,
+      31,
+      63,
+      127,
+      255,
+      511,
+      1023,
+      2047,
+      4095
+    ],
+    "pwc_quadrature_points": 8,
+    "repetitions": 30,
+    "seed": 1,
+    "time_steps": 9
+  },
+  "error_generation": {
+    "duration_s": 68.310043,
+    "finished_at_utc": "2026-07-29T16:21:38.757157+00:00",
+    "generated_columns": [
+      "mean_error_rad",
+      "max_mean_error_rad",
+      "l1_error",
+      "max_l1_error",
+      "min_evaluated_density",
+      "max_normalization_error"
+    ],
+    "git_commit": "995b508e3ec9475ead0d7356607b3a7e8cad4aee",
+    "host": "runnervmvrwv9",
+    "load_average_after": [
+      1.2119140625,
+      0.69189453125,
+      0.27880859375
+    ],
+    "load_average_before": [
+      1.68798828125,
+      0.6064453125,
+      0.2177734375
+    ],
+    "logical_cpus": 4,
+    "numpy_version": "2.4.6",
+    "platform": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "pyrecest_available": false,
+    "python_executable": "/opt/hostedtoolcache/Python/3.11.15/x64/bin/python",
+    "python_version": "3.11.15",
+    "source_tree_sha256": "ffa312875659a819b9acaa0572eb12ebcac6713affa7cd3fd13599dc8b79c7e3",
+    "started_at_utc": "2026-07-29T16:20:30.447114+00:00"
+  },
+  "evaluation_mode": "combined",
+  "runtime_scope": {
+    "excluded": [
+      "reference generation",
+      "transition-kernel construction",
+      "likelihood cell projection",
+      "dense FIGF interpolation",
+      "PWC densification",
+      "particle KDE reconstruction"
+    ],
+    "included": [
+      "forward filter",
+      "backward smoother"
+    ]
+  },
+  "schema_version": 2,
+  "timing_generation": {
+    "duration_s": 68.310043,
+    "finished_at_utc": "2026-07-29T16:21:38.757157+00:00",
+    "generated_columns": [
+      "runtime_s"
+    ],
+    "git_commit": "995b508e3ec9475ead0d7356607b3a7e8cad4aee",
+    "host": "runnervmvrwv9",
+    "load_average_after": [
+      1.2119140625,
+      0.69189453125,
+      0.27880859375
+    ],
+    "load_average_before": [
+      1.68798828125,
+      0.6064453125,
+      0.2177734375
+    ],
+    "logical_cpus": 4,
+    "numpy_version": "2.4.6",
+    "platform": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "pyrecest_available": false,
+    "python_executable": "/opt/hostedtoolcache/Python/3.11.15/x64/bin/python",
+    "python_version": "3.11.15",
+    "source_tree_sha256": "ffa312875659a819b9acaa0572eb12ebcac6713affa7cd3fd13599dc8b79c7e3",
+    "started_at_utc": "2026-07-29T16:20:30.447114+00:00"
+  }
+}

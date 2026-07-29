@@ -8,6 +8,8 @@ from typing import Callable, Iterable
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+from .nonnegative import clip_roundoff_nonnegative
+
 
 @dataclass(frozen=True)
 class GridSmoothingResult:
@@ -49,13 +51,13 @@ class TorusAdditiveGridTransition:
     ) -> "TorusAdditiveGridTransition":
         shape = _shape_tuple(grid_shape)
         return cls(
-            noise_density=_as_real(noise_density, "noise_density"),
+            noise_density=clip_roundoff_nonnegative(noise_density, "noise_density"),
             cell_volume=cell_volume_for_grid(shape),
             normalize_noise=normalize_noise,
         )
 
     def __call__(self, next_message: ArrayLike, t: int) -> NDArray[np.float64]:
-        message = _as_real(next_message, "next_message")
+        message = clip_roundoff_nonnegative(next_message, "next_message")
         noise = self._noise_at(t, message.shape)
         if self.normalize_noise:
             noise = normalize_grid_density(noise, self.cell_volume)
@@ -64,7 +66,7 @@ class TorusAdditiveGridTransition:
         # On the periodic grid this is a circular cross-correlation.
         beta = np.fft.ifftn(np.conj(np.fft.fftn(noise)) * np.fft.fftn(message)).real
         beta *= self.cell_volume
-        return np.maximum(beta, 0.0)
+        return clip_roundoff_nonnegative(beta, "additive backward prediction")
 
     def _noise_at(self, t: int, grid_shape: tuple[int, ...]) -> NDArray[np.float64]:
         noise = self.noise_density
@@ -99,7 +101,7 @@ class DenseGridTransition:
         normalize_columns: bool = True,
     ) -> "DenseGridTransition":
         shape = _shape_tuple(grid_shape)
-        matrix = _as_real(transition_density, "transition_density")
+        matrix = clip_roundoff_nonnegative(transition_density, "transition_density")
         n_grid = int(np.prod(shape))
         if matrix.shape not in ((n_grid, n_grid),) and not (
             matrix.ndim == 3 and matrix.shape[1:] == (n_grid, n_grid)
@@ -112,27 +114,28 @@ class DenseGridTransition:
         return cls(matrix, shape, float(cell_volume), normalize_columns=normalize_columns)
 
     def __call__(self, next_message: ArrayLike, t: int) -> NDArray[np.float64]:
-        message = _as_real(next_message, "next_message")
+        message = clip_roundoff_nonnegative(next_message, "next_message")
         if message.shape != self.grid_shape:
             raise ValueError(f"next_message shape {message.shape} does not match grid shape {self.grid_shape}")
         matrix = self._matrix_at(t)
         values = self.cell_volume * matrix.T @ message.reshape(-1)
-        return np.maximum(values.reshape(self.grid_shape), 0.0)
+        return clip_roundoff_nonnegative(values.reshape(self.grid_shape), "dense backward prediction")
 
     def forward_predict(self, current_density: ArrayLike, t: int) -> NDArray[np.float64]:
         """Apply the forward transition to grid density values."""
 
-        density = _as_real(current_density, "current_density")
+        density = clip_roundoff_nonnegative(current_density, "current_density")
         if density.shape != self.grid_shape:
             raise ValueError(f"current_density shape {density.shape} does not match grid shape {self.grid_shape}")
         matrix = self._matrix_at(t)
         values = self.cell_volume * matrix @ density.reshape(-1)
-        return np.maximum(values.reshape(self.grid_shape), 0.0)
+        return clip_roundoff_nonnegative(values.reshape(self.grid_shape), "dense forward prediction")
 
     def _matrix_at(self, t: int) -> NDArray[np.float64]:
         matrix = self.transition_density
         if matrix.ndim == 3:
             matrix = matrix[t]
+        matrix = clip_roundoff_nonnegative(matrix, "transition_density")
         if self.normalize_columns:
             column_integrals = np.sum(matrix, axis=0, keepdims=True) * self.cell_volume
             if not np.all(np.isfinite(column_integrals)) or np.any(column_integrals <= 0.0):
@@ -159,7 +162,7 @@ def cell_volume_for_grid(grid_shape: Iterable[int]) -> float:
 def normalize_grid_density(values: ArrayLike, cell_volume: float) -> NDArray[np.float64]:
     """Normalize grid values so that sum(values) * cell_volume = 1."""
 
-    arr = np.maximum(_as_real(values, "values"), 0.0)
+    arr = clip_roundoff_nonnegative(values, "values")
     integral = float(np.sum(arr) * cell_volume)
     if not np.isfinite(integral) or integral <= 0.0:
         raise ValueError(f"density integral must be positive and finite, got {integral}")
@@ -176,12 +179,12 @@ def grid_backward_information_smoother(
 ) -> GridSmoothingResult:
     """Fixed-interval smoother using a backward information recursion.
 
-    ``filtered[t]`` is p(x_t | z_1, ..., z_t). ``likelihoods[t]`` is p(z_t|x_t).
+    ``filtered[t]`` is p(x_t | z_0, ..., z_t). ``likelihoods[t]`` is p(z_t|x_t).
     The returned density is proportional to ``filtered[t] * beta[t]``.
     """
 
-    f = np.maximum(_as_real(filtered, "filtered"), 0.0)
-    ell = np.maximum(_as_real(likelihoods, "likelihoods"), 0.0)
+    f = clip_roundoff_nonnegative(filtered, "filtered")
+    ell = clip_roundoff_nonnegative(likelihoods, "likelihoods")
     _check_time_grid_pair(f, ell)
     if cell_volume is None:
         cell_volume = cell_volume_for_grid(f.shape[1:])
@@ -195,7 +198,8 @@ def grid_backward_information_smoother(
     smoothed[-1], normalizers[-1] = _normalize_product(f[-1], beta[-1], cell_volume)
 
     for t in range(steps - 2, -1, -1):
-        beta_t = np.maximum(_as_real(backward_predict(ell[t + 1] * beta[t + 1], t), "beta_t"), 0.0)
+        future = clip_roundoff_nonnegative(ell[t + 1] * beta[t + 1], "future information product")
+        beta_t = clip_roundoff_nonnegative(backward_predict(future, t), "beta_t")
         if beta_t.shape != f.shape[1:]:
             raise ValueError(f"backward_predict returned {beta_t.shape}, expected {f.shape[1:]}")
         if normalize_backward:
@@ -450,7 +454,7 @@ def _noise_coeffs_at(noise_coefficients: ArrayLike, t: int, coeff_shape: tuple[i
 
 
 def _normalize_product(a: NDArray[np.float64], b: NDArray[np.float64], cell_volume: float):
-    product = np.maximum(a * b, 0.0)
+    product = clip_roundoff_nonnegative(a * b, "smoothing product")
     normalizer = float(np.sum(product) * cell_volume)
     if not np.isfinite(normalizer) or normalizer <= 0.0:
         raise ValueError(f"smoothing normalizer must be positive and finite, got {normalizer}")
