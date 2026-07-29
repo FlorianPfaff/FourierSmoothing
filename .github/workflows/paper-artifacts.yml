@@ -13,6 +13,9 @@ on:
           - smoke
           - paper
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -21,13 +24,16 @@ jobs:
   generate:
     name: Generate paper artifacts
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       PROFILE: ${{ github.event.inputs.profile || 'smoke' }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -49,3 +55,33 @@ jobs:
           name: fourier-smoothing-paper-artifacts-${{ env.PROFILE }}
           path: generated_paper_artifacts/**
           if-no-files-found: error
+
+      - name: Generate final public evidence
+        if: github.event_name == 'pull_request' && github.head_ref == 'agent/final-paper-hardening'
+        run: |
+          rm -rf generated_final_evidence
+          mkdir -p generated_final_evidence/evaluation generated_final_evidence/gain generated_final_evidence/diagnostics
+          python scripts/run_smoothing_evaluation.py \
+            --output-dir generated_final_evidence/evaluation \
+            --repetitions 30 \
+            --seed 1
+          python scripts/run_smoothing_error_reduction.py \
+            --output-dir generated_final_evidence/gain
+          python scripts/run_reference_diagnostics.py \
+            --output-dir generated_final_evidence/diagnostics
+          python scripts/run_adjoint_validation.py \
+            --output-dir generated_final_evidence/diagnostics
+          python scripts/publish_final_evidence.py
+
+      - name: Commit final public evidence
+        if: github.event_name == 'pull_request' && github.head_ref == 'agent/final-paper-hardening'
+        run: |
+          rm -rf generated_final_evidence generated_paper_artifacts
+          rm -f .github/workflows/publish-final-evidence.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish complete paper evidence and diagnostics'
+            git push origin HEAD:agent/final-paper-hardening
+          fi
