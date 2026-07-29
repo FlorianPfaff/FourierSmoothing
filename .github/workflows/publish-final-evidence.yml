@@ -1,8 +1,8 @@
 name: Publish final paper evidence
 
 on:
-  pull_request:
-    branches: [main]
+  push:
+    branches: [agent/final-paper-hardening]
 
 permissions:
   contents: write
@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.head_ref == 'agent/final-paper-hardening'
+    if: github.ref == 'refs/heads/agent/final-paper-hardening'
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -80,20 +80,14 @@ jobs:
 
           with (generated / 'evaluation/smoothing_evaluation_summary.csv').open(newline='', encoding='utf-8') as handle:
               summary_rows = list(csv.DictReader(handle))
-          accuracy_summary_fields = [
-              field for field in summary_rows[0]
-              if not field.startswith('runtime_s_')
-          ]
+          accuracy_summary_fields = [field for field in summary_rows[0] if not field.startswith('runtime_s_')]
           with (evidence / 'smoothing_accuracy_summary.csv').open('w', newline='', encoding='utf-8') as handle:
               writer = csv.DictWriter(handle, fieldnames=accuracy_summary_fields, lineterminator='\n')
               writer.writeheader()
               for row in summary_rows:
                   writer.writerow({field: row[field] for field in accuracy_summary_fields})
 
-          summary_by_key = {
-              (row['method'], int(row['parameter'])): row
-              for row in summary_rows
-          }
+          summary_by_key = {(row['method'], int(row['parameter'])): row for row in summary_rows}
           slugs = {'FIGFAN': 'figfan', 'FIGFDN': 'figfdn', 'PF': 'pf', 'PWC': 'pwc'}
           old_header = [
               'n', 'runtime_mean_ms', 'runtime_median_ms', 'runtime_q25_ms',
