@@ -7,7 +7,7 @@ authors:
     given-names: Florian
 repository-code: "https://github.com/FlorianPfaff/FourierSmoothing"
 version: 0.1.0
-date-released: 2026-07-27
+date-released: 2026-07-29
 license: MIT
 preferred-citation:
   type: article
