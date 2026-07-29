@@ -1,0 +1,36 @@
+name: Apply final implementation hardening
+
+on:
+  push:
+    branches: [agent/final-paper-hardening]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-final-implementation-hardening
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'Apply final implementation hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/final-paper-hardening
+          fetch-depth: 0
+
+      - name: Apply deterministic edits
+        run: python tools/apply_final_hardening.py
+
+      - name: Commit applied changes
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'Apply final implementation hardening'
+          git push origin HEAD:agent/final-paper-hardening
