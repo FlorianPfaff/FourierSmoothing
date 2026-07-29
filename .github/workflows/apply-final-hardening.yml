@@ -1,8 +1,8 @@
 name: Apply final implementation hardening
 
 on:
-  push:
-    branches: [agent/final-paper-hardening]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   apply:
-    if: github.event.head_commit.message != 'Apply final implementation hardening'
+    if: github.head_ref == 'agent/final-paper-hardening'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
