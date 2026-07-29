@@ -1,0 +1,4 @@
+case,absolute_error
+2d_additive_weighted_adjoint,0.0
+2d_additive_fft_vs_dense_adjoint,8.881784197001252e-16
+1d_nonadditive_weighted_adjoint,0.0
