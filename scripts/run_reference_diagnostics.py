@@ -74,7 +74,9 @@ def main() -> None:
     moment_array = np.stack(moments, axis=0)
     aggregate = np.mean(moment_array, axis=0)
     aggregate_angles = np.angle(aggregate)
-    deviations = np.abs(np.angle(np.exp(1j * (np.angle(moment_array) - aggregate_angles[None, :]))))
+    deviations = np.abs(
+        np.angle(np.exp(1j * (np.angle(moment_array) - aggregate_angles[None, :])))
+    )
 
     low_likelihoods = make_pwc_cell_averaged_likelihoods_1d(
         (args.low_grid_size,),
@@ -120,8 +122,7 @@ def main() -> None:
         ],
     }
     (args.output_dir / "reference_stability.json").write_text(
-        json.dumps(summary, indent=2, sort_keys=True) + "
-",
+        json.dumps(summary, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     print(csv_path)
