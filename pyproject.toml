@@ -9,6 +9,8 @@ description = "Reference implementation of Fourier/grid backward-information smo
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Florian Pfaff" }]
+license = { file = "LICENSE" }
+keywords = ["Bayesian smoothing", "Fourier filter", "grid filter", "hypertorus"]
 dependencies = ["numpy>=1.23"]
 
 [project.optional-dependencies]

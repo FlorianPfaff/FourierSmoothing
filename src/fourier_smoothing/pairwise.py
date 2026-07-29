@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+from .nonnegative import clip_roundoff_nonnegative
 from .smoother import cell_volume_for_grid, normalize_grid_density
 
 
@@ -171,9 +172,4 @@ def _normalize_transition_matrix(matrix: NDArray[np.float64], cell_volume: float
 
 
 def _finite_nonnegative_array(values: ArrayLike, name: str) -> NDArray[np.float64]:
-    array = np.asarray(values, dtype=np.float64)
-    if array.size == 0 or not np.all(np.isfinite(array)):
-        raise ValueError(f"{name} must be non-empty and finite")
-    if np.any(array < 0.0):
-        raise ValueError(f"{name} must be nonnegative")
-    return array
+    return clip_roundoff_nonnegative(values, name)

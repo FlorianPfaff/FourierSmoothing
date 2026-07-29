@@ -12,6 +12,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+from .nonnegative import clip_roundoff_nonnegative
+
 
 TWOPI = 2.0 * np.pi
 
@@ -85,7 +87,7 @@ def sample_from_grid_density_1d(
     density = np.asarray(density_values, dtype=float)
     if density.ndim != 1 or density.size == 0:
         raise ValueError("density_values must be a non-empty one-dimensional array.")
-    probabilities = _normalize_weights(np.maximum(density, 0.0))
+    probabilities = _normalize_weights(clip_roundoff_nonnegative(density, "density_values"))
     indices = rng.choice(density.size, size=n_samples, p=probabilities)
     offsets = rng.random(n_samples) if jitter_within_cell else np.zeros(n_samples)
     return TWOPI * (indices + offsets) / density.size
@@ -108,10 +110,10 @@ def bootstrap_particle_filter_1d(
     if n_particles <= 0:
         raise ValueError("n_particles must be positive.")
     rng = _as_rng(rng)
-    likelihood_array = np.asarray(likelihoods, dtype=float)
+    likelihood_array = clip_roundoff_nonnegative(likelihoods, "likelihoods")
     if likelihood_array.ndim != 2 or likelihood_array.shape[0] < 1:
         raise ValueError("likelihoods must have shape (T, n_grid).")
-    noise = np.asarray(noise_density, dtype=float)
+    noise = clip_roundoff_nonnegative(noise_density, "noise_density")
     if noise.ndim != 1 or noise.size != likelihood_array.shape[1]:
         raise ValueError("noise_density must be one-dimensional with the likelihood grid size.")
 
@@ -153,7 +155,7 @@ def bootstrap_von_mises_particle_filter_1d(
     if noise_concentration < 0.0:
         raise ValueError("noise_concentration must be nonnegative.")
     rng = _as_rng(rng)
-    likelihood_array = np.asarray(likelihoods, dtype=float)
+    likelihood_array = clip_roundoff_nonnegative(likelihoods, "likelihoods")
     if likelihood_array.ndim != 2 or likelihood_array.shape[0] < 1:
         raise ValueError("likelihoods must have shape (T, n_grid).")
 
@@ -184,7 +186,7 @@ def ffbsi_particle_smoother_1d(
     if n_trajectories <= 0:
         raise ValueError("n_trajectories must be positive.")
     rng = _as_rng(rng)
-    noise = np.asarray(noise_density, dtype=float)
+    noise = clip_roundoff_nonnegative(noise_density, "noise_density")
     if noise.ndim != 1 or noise.size == 0:
         raise ValueError("noise_density must be a non-empty one-dimensional array.")
 
@@ -310,7 +312,7 @@ def _sample_exact_von_mises_ancestors(
 
 
 def _normalize_weights(weights: NDArray[np.float64]) -> NDArray[np.float64]:
-    w = np.maximum(np.asarray(weights, dtype=float), 0.0)
+    w = clip_roundoff_nonnegative(weights, "weights")
     total = float(np.sum(w))
     if not np.isfinite(total) or total <= 0.0:
         return np.full(w.shape, 1.0 / w.size)

@@ -156,6 +156,14 @@ result = grid_backward_information_smoother(filtered, likelihoods, transition)
 smoothed = result.smoothed
 ```
 
+## Numerical nonnegativity policy
+
+Grid densities, likelihoods, and sampled transitions are validated as nonnegative. Only undershoots within a scale-aware floating-point tolerance are clipped to zero; materially negative values raise `ValueError`. This prevents an invalid signed transition approximation from being silently repaired.
+
+## Citation and license
+
+Citation metadata are provided in `CITATION.cff`. The implementation is released under the MIT License; see `LICENSE`.
+
 ## Scope
 
 The efficient special case is additive torus dynamics, where forward and backward propagation reduce to FFT-based cyclic convolution/correlation. Dense grid and Fourier transition operators are also provided for general models; scalable sparse or low-rank general-transition representations remain future work. The coefficient-only identity smoother retains both aliasing-free truncated-convolution and same-grid diagnostic multiplication paths.

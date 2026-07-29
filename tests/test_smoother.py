@@ -1,9 +1,11 @@
 import numpy as np
+import pytest
 
 from fourier_smoothing import (
     DenseGridTransition,
     TorusAdditiveGridTransition,
     cell_volume_for_grid,
+    clip_roundoff_nonnegative,
     fourier_identity_smoother,
     fourier_to_grid,
     grid_backward_information_smoother,

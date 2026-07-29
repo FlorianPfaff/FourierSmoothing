@@ -61,7 +61,11 @@ def _read_rows(csv_path: Path) -> list[dict[str, str | int | float]]:
                     "runtime_s_q25": float(row["runtime_s_q25"]),
                     "runtime_s_q75": float(row["runtime_s_q75"]),
                     "mean_error_rad": float(row["mean_error_rad_mean"]),
+                    "mean_error_rad_q25": float(row["mean_error_rad_q25"]),
+                    "mean_error_rad_q75": float(row["mean_error_rad_q75"]),
                     "l1_error": float(row["l1_error_mean"]),
+                    "l1_error_q25": float(row["l1_error_q25"]),
+                    "l1_error_q75": float(row["l1_error_q75"]),
                 }
             )
     if not rows:
@@ -84,7 +88,9 @@ def _write_pgfplot_data(
     written: list[Path] = []
     header = (
         "n runtime_mean_ms runtime_median_ms runtime_q25_ms runtime_q75_ms "
-        "runtime_err_low_ms runtime_err_high_ms mean_error l1_error"
+        "runtime_err_low_ms runtime_err_high_ms mean_error mean_error_q25 "
+        "mean_error_q75 mean_error_err_low mean_error_err_high l1_error l1_error_q25 "
+        "l1_error_q75 l1_error_err_low l1_error_err_high"
     )
     for method, slug in PGF_METHOD_SLUGS.items():
         method_rows = sorted(
@@ -109,7 +115,15 @@ def _write_pgfplot_data(
                         _format_data_value(err_low_ms),
                         _format_data_value(err_high_ms),
                         _format_data_value(float(row["mean_error_rad"])),
+                        _format_data_value(float(row["mean_error_rad_q25"])),
+                        _format_data_value(float(row["mean_error_rad_q75"])),
+                        _format_data_value(float(row["mean_error_rad"]) - float(row["mean_error_rad_q25"])),
+                        _format_data_value(float(row["mean_error_rad_q75"]) - float(row["mean_error_rad"])),
                         _format_data_value(float(row["l1_error"])),
+                        _format_data_value(float(row["l1_error_q25"])),
+                        _format_data_value(float(row["l1_error_q75"])),
+                        _format_data_value(float(row["l1_error"]) - float(row["l1_error_q25"])),
+                        _format_data_value(float(row["l1_error_q75"]) - float(row["l1_error"])),
                     ]
                 )
             )
@@ -236,16 +250,23 @@ def _draw_metric_by_runtime(
         lower_errors = []
         upper_errors = []
         values = []
+        value_lower_errors = []
+        value_upper_errors = []
         for row in method_rows:
             median_ms, _, _, err_low_ms, err_high_ms = _runtime_ms_and_iqr(row)
             medians.append(median_ms)
             lower_errors.append(err_low_ms)
             upper_errors.append(err_high_ms)
-            values.append(float(row[metric]))
+            value = float(row[metric])
+            values.append(value)
+            value_lower_errors.append(value - float(row[f"{metric}_q25"]))
+            value_upper_errors.append(float(row[f"{metric}_q75"]) - value)
+        yerr = [value_lower_errors, value_upper_errors] if method == "PF" else None
         ax.errorbar(
             medians,
             values,
             xerr=[lower_errors, upper_errors],
+            yerr=yerr,
             label=method,
             capsize=1.5,
             elinewidth=0.6,

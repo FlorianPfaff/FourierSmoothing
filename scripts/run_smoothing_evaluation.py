@@ -67,6 +67,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--error-source-host", help="Host that generated --reuse-error-raw, for provenance.")
     parser.add_argument("--error-source-git-commit", help="Code revision that generated --reuse-error-raw.")
+    parser.add_argument(
+        "--error-source-metadata",
+        type=Path,
+        help="Optional JSON metadata describing the environment that generated --reuse-error-raw.",
+    )
     return parser.parse_args()
 
 
@@ -237,25 +242,33 @@ def _write_metadata(
     load_after: tuple[float, float, float] | None,
 ) -> Path:
     repository_root = Path(__file__).resolve().parents[1]
+    current_environment = _environment_metadata(
+        repository_root,
+        started_at=started_at,
+        finished_at=finished_at,
+        load_before=load_before,
+        load_after=load_after,
+    )
+    if args.reuse_error_raw is None:
+        evaluation_mode = "combined"
+        error_generation = {
+            **current_environment,
+            "generated_columns": [
+                "mean_error_rad",
+                "max_mean_error_rad",
+                "l1_error",
+                "max_l1_error",
+                "min_evaluated_density",
+                "max_normalization_error",
+            ],
+        }
+    else:
+        evaluation_mode = "split_accuracy_timing"
+        error_generation = _error_source_metadata(args)
+
     metadata = {
-        "schema_version": 1,
-        "started_at_utc": started_at.isoformat(),
-        "finished_at_utc": finished_at.isoformat(),
-        "duration_s": (finished_at - started_at).total_seconds(),
-        "host": platform.node(),
-        "platform": platform.platform(),
-        "processor": platform.processor(),
-        "logical_cpus": os.cpu_count(),
-        "load_average_before": load_before,
-        "load_average_after": load_after,
-        "python_version": platform.python_version(),
-        "python_executable": sys.executable,
-        "numpy_version": np.__version__,
-        "pyrecest_available": importlib.util.find_spec("pyrecest") is not None,
-        "git_commit": os.environ.get("FOURIER_SMOOTHING_GIT_COMMIT") or _git_commit(repository_root),
-        "source_tree_sha256": _source_tree_hash(repository_root),
-        "evaluation_mode": "split_accuracy_timing" if args.reuse_error_raw is not None else "combined",
-        "error_source": _error_source_metadata(args),
+        "schema_version": 2,
+        "evaluation_mode": evaluation_mode,
         "configuration": {
             "figf_grid_sizes": args.figf_grid_sizes,
             "pwc_grid_sizes": args.pwc_grid_sizes,
@@ -271,11 +284,17 @@ def _write_metadata(
             "pwc_quadrature_points": args.pwc_quadrature_points,
             "seed": args.seed,
         },
+        "error_generation": error_generation,
+        "timing_generation": {
+            **current_environment,
+            "generated_columns": ["runtime_s"],
+        },
         "runtime_scope": {
             "included": ["forward filter", "backward smoother"],
             "excluded": [
                 "reference generation",
                 "transition-kernel construction",
+                "likelihood cell projection",
                 "dense FIGF interpolation",
                 "PWC densification",
                 "particle KDE reconstruction",
@@ -287,6 +306,32 @@ def _write_metadata(
     path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
+
+def _environment_metadata(
+    repository_root: Path,
+    *,
+    started_at: dt.datetime,
+    finished_at: dt.datetime,
+    load_before: tuple[float, float, float] | None,
+    load_after: tuple[float, float, float] | None,
+) -> dict[str, object]:
+    return {
+        "started_at_utc": started_at.isoformat(),
+        "finished_at_utc": finished_at.isoformat(),
+        "duration_s": (finished_at - started_at).total_seconds(),
+        "host": platform.node(),
+        "platform": platform.platform(),
+        "processor": platform.processor(),
+        "logical_cpus": os.cpu_count(),
+        "load_average_before": load_before,
+        "load_average_after": load_after,
+        "python_version": platform.python_version(),
+        "python_executable": sys.executable,
+        "numpy_version": np.__version__,
+        "pyrecest_available": importlib.util.find_spec("pyrecest") is not None,
+        "git_commit": os.environ.get("FOURIER_SMOOTHING_GIT_COMMIT") or _git_commit(repository_root),
+        "source_tree_sha256": _source_tree_hash(repository_root),
+    }
 
 def _load_average() -> tuple[float, float, float] | None:
     try:
@@ -322,12 +367,25 @@ def _source_tree_hash(repository_root: Path) -> str:
 def _error_source_metadata(args: argparse.Namespace) -> dict[str, str | None] | None:
     if args.reuse_error_raw is None:
         return None
-    return {
+    metadata: dict[str, object] = {
         "path": str(args.reuse_error_raw),
         "sha256": _file_sha256(args.reuse_error_raw),
         "host": args.error_source_host,
         "git_commit": args.error_source_git_commit,
+        "generated_columns": [
+            "mean_error_rad",
+            "max_mean_error_rad",
+            "l1_error",
+            "max_l1_error",
+            "min_evaluated_density",
+            "max_normalization_error",
+        ],
     }
+    if args.error_source_metadata is not None:
+        metadata["source_environment"] = json.loads(
+            args.error_source_metadata.read_text(encoding="utf-8")
+        )
+    return metadata
 
 
 def _file_sha256(path: Path) -> str:

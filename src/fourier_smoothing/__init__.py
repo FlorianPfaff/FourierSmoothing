@@ -62,6 +62,11 @@ from .particle import (
     systematic_resample,
     transition_density_from_noise_1d,
 )
+from .nonnegative import (
+    DEFAULT_NEGATIVITY_ATOL,
+    DEFAULT_NEGATIVITY_RTOL,
+    clip_roundoff_nonnegative,
+)
 from .particle_experiments import (
     ParticleBaselineRow,
     circular_abs_difference,
@@ -98,6 +103,8 @@ _experiments.run_smoothing_runtime_evaluation = run_smoothing_runtime_evaluation
 
 __all__ = [
     "BenchmarkRow",
+    "DEFAULT_NEGATIVITY_ATOL",
+    "DEFAULT_NEGATIVITY_RTOL",
     "DenseGridTransition",
     "FIGFPWCBenchmarkRow",
     "FourierSmoothingResult",
@@ -119,6 +126,7 @@ __all__ = [
     "cell_volume_for_grid",
     "circular_abs_difference",
     "circular_mean",
+    "clip_roundoff_nonnegative",
     "ffbsi_particle_smoother_1d",
     "ffbsi_von_mises_particle_smoother_1d",
     "filtered_from_likelihoods",
