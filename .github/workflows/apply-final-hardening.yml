@@ -25,7 +25,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply deterministic edits
-        run: python tools/apply_final_hardening.py
+        run: |
+          python tools/fix_apply_script.py
+          python tools/apply_final_hardening.py
 
       - name: Commit applied changes
         run: |
