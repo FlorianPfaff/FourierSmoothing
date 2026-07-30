@@ -14,7 +14,7 @@ concurrency:
 jobs:
   timing:
     if: github.head_ref == 'agent/refresh-final-timings'
-    runs-on: [self-hosted, Linux, X64, gpuserver6000]
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 360
     env:
       FINAL_IMPLEMENTATION_SHA: 194d1f9b4bb49180831a9162358302f189141633
