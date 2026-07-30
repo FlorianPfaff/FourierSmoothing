@@ -13,6 +13,210 @@ on:
         required: true
         default: '1'
         type: string
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: paper-benchmark-gpuserver6000-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    name: Final accuracy-runtime benchmark
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/refresh-final-timings'
+    runs-on: [self-hosted, Linux, X64, gpuserver6000]
+    timeout-minutes: 360
+    env:
+      BENCHMARK_REPETITIONS: ${{ inputs.repetitions || '30' }}
+      BENCHMARK_SEED: ${{ inputs.seed || '1' }}
+      FINAL_IMPLEMENTATION_SHA: 194d1f9b4bb49180831a9162358302f189141633
+
+    steps:
+      - name: Check out publication branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Check out exact released implementation
+        uses: actions/checkout@v4
+        with:
+          repository: FlorianPfaff/FourierSmoothing
+          ref: 194d1f9b4bb49180831a9162358302f189141633
+          path: timed_source
+
+      - name: Record benchmark environment
+        run: |
+          mkdir -p paper_benchmark/environment
+          date --iso-8601=seconds | tee paper_benchmark/environment/date.txt
+          hostname | tee paper_benchmark/environment/hostname.txt
+          uname -a | tee paper_benchmark/environment/uname.txt
+          uptime | tee paper_benchmark/environment/uptime.txt
+          nproc | tee paper_benchmark/environment/nproc.txt
+          lscpu | tee paper_benchmark/environment/lscpu.txt
+          free -h | tee paper_benchmark/environment/memory.txt
+          python --version | tee paper_benchmark/environment/python.txt
+          python -m pip freeze > paper_benchmark/environment/pip-freeze-before.txt
+          git -C timed_source rev-parse HEAD | tee paper_benchmark/environment/timed-source-commit.txt
+
+      - name: Install benchmark package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e './timed_source[paper]'
+          python -m pip freeze > paper_benchmark/environment/pip-freeze-after.txt
+
+      - name: Wait for an idle timing host
+        timeout-minutes: 180
+        run: |
+          consecutive=0
+          while [ "${consecutive}" -lt 3 ]; do
+            read -r load_one load_five load_fifteen _ < /proc/loadavg
+            if awk -v one="${load_one}" -v five="${load_five}" \
+              'BEGIN { exit !(one < 2.0 && five < 3.0) }'; then
+              consecutive=$((consecutive + 1))
+            else
+              consecutive=0
+            fi
+            printf 'idle gate %s/3 load=%s,%s,%s %s\n' \
+              "${consecutive}" "${load_one}" "${load_five}" "${load_fifteen}" "$(date --iso-8601=seconds)"
+            sleep 60
+          done
+
+      - name: Time the exact final implementation
+        env:
+          FOURIER_SMOOTHING_GIT_COMMIT: ${{ env.FINAL_IMPLEMENTATION_SHA }}
+        run: |
+          python timed_source/scripts/run_smoothing_evaluation.py \
+            --output-dir paper_benchmark/results \
+            --reuse-error-raw paper_evidence/smoothing_accuracy_raw.csv \
+            --error-source-host runnervmvrwv9 \
+            --error-source-git-commit 995b508e3ec9475ead0d7356607b3a7e8cad4aee \
+            --error-source-metadata paper_evidence/accuracy_regeneration_environment.json \
+            --repetitions "${BENCHMARK_REPETITIONS}" \
+            --seed "${BENCHMARK_SEED}"
+
+      - name: Generate refreshed plot data
+        run: |
+          python timed_source/scripts/plot_runtime_accuracy_column.py \
+            --results-dir paper_benchmark/results \
+            --figures-dir paper_benchmark/figures \
+            --formats png
+
+      - name: Publish final timing evidence
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import csv
+          import hashlib
+          import json
+          import shutil
+          from pathlib import Path
+
+          evidence = Path('paper_evidence')
+          results = Path('paper_benchmark/results')
+          data = Path('paper_benchmark/figures/data')
+          evidence.mkdir(exist_ok=True)
+
+          combined_path = results / 'smoothing_evaluation_raw.csv'
+          shutil.copy2(combined_path, evidence / 'smoothing_evaluation_raw.csv')
+          shutil.copy2(results / 'smoothing_evaluation_summary.csv', evidence / 'smoothing_evaluation_summary.csv')
+
+          with combined_path.open(newline='', encoding='utf-8') as handle:
+              rows = list(csv.DictReader(handle))
+          timing_fields = ['method', 'parameter', 'repetition', 'runtime_s']
+          timing_path = evidence / 'smoothing_runtime_raw.csv'
+          with timing_path.open('w', newline='', encoding='utf-8') as handle:
+              writer = csv.DictWriter(handle, fieldnames=timing_fields, lineterminator='\n')
+              writer.writeheader()
+              for row in rows:
+                  writer.writerow({field: row[field] for field in timing_fields})
+
+          for slug in ('figfan', 'figfdn', 'pf', 'pwc'):
+              shutil.copy2(
+                  data / f'smoothing_evaluation_{slug}.dat',
+                  evidence / f'smoothing_evaluation_{slug}.dat',
+              )
+
+          metadata = json.loads((results / 'smoothing_evaluation_metadata.json').read_text(encoding='utf-8'))
+          metadata['schema_version'] = 4
+          metadata['evaluation_mode'] = 'final_release_split_accuracy_timing'
+          metadata['error_generation']['implementation_merged_commit'] = '194d1f9b4bb49180831a9162358302f189141633'
+          metadata['timing_generation']['implementation_git_commit'] = '194d1f9b4bb49180831a9162358302f189141633'
+          metadata['timing_generation']['raw_path'] = 'paper_evidence/smoothing_runtime_raw.csv'
+          metadata['timing_generation']['raw_sha256'] = hashlib.sha256(timing_path.read_bytes()).hexdigest()
+          metadata['combined_raw_data'] = {
+              'path': 'paper_evidence/smoothing_evaluation_raw.csv',
+              'sha256': hashlib.sha256((evidence / 'smoothing_evaluation_raw.csv').read_bytes()).hexdigest(),
+              'join_key': ['method', 'parameter', 'repetition'],
+              'assembly': 'Published accuracy columns and final-release timing columns joined after exact key equality.',
+          }
+          metadata['public_evidence'] = {
+              'repository': 'FlorianPfaff/FourierSmoothing',
+              'path': 'paper_evidence',
+              'accuracy_raw': 'paper_evidence/smoothing_accuracy_raw.csv',
+              'timing_raw': 'paper_evidence/smoothing_runtime_raw.csv',
+              'combined_raw': 'paper_evidence/smoothing_evaluation_raw.csv',
+              'summary': 'paper_evidence/smoothing_evaluation_summary.csv',
+              'gain_raw': 'paper_evidence/smoothing_gain_raw.csv',
+              'gain_summary': 'paper_evidence/smoothing_gain_summary.csv',
+              'reference_first_moments': 'paper_evidence/reference_first_moments.csv',
+              'reference_stability': 'paper_evidence/reference_stability.json',
+              'adjoint_validation': 'paper_evidence/adjoint_validation.csv',
+          }
+          (evidence / 'smoothing_evaluation_metadata.json').write_text(
+              json.dumps(metadata, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+
+          readme = '''# Public evidence snapshot for the FIGF smoothing paper
+
+This directory is the public numerical-evidence snapshot referenced by the manuscript *Fixed-Interval Smoothing with the Fourier-Interpreted Grid Filter*.
+
+It contains:
+
+- one generated PGFPlots data file per evaluated method, including final-release controlled runtime mean, median, quartiles and IQR errors, plus mean-direction and $L^1$ accuracy means and quartiles;
+- `smoothing_accuracy_raw.csv`, the complete 30-repetition accuracy rows;
+- `smoothing_runtime_raw.csv`, the complete 30-repetition controlled timing rows measured on implementation commit `194d1f9b4bb49180831a9162358302f189141633`;
+- `smoothing_evaluation_raw.csv`, the exact keywise combination used for the paper figures and summary;
+- complete raw and summarized 500-sequence filtering-versus-smoothing state-error results;
+- the three high-sample reference first-moment sequences and the 65,535-versus-131,071-cell reference-refinement diagnostic;
+- weighted-adjoint validation for two-dimensional additive and one-dimensional nonadditive transitions;
+- split provenance metadata for accuracy and final-release timing generation.
+
+Accuracy values are arithmetic means over repetitions. Runtime plots use the median with the first and third quartiles because PF/FFBSi timings are right-skewed. PF accuracy intervals use the corresponding accuracy quartiles.
+'''
+          (evidence / 'README.md').write_text(readme, encoding='utf-8')
+
+          manifest = []
+          for path in sorted(evidence.iterdir()):
+              if path.is_file() and path.name != 'SHA256SUMS':
+                  manifest.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}")
+          (evidence / 'SHA256SUMS').write_text('\n'.join(manifest) + '\n', encoding='utf-8')
+          PY
+
+      - name: Restore dispatch-only benchmark workflow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          Path('.github/workflows/paper-benchmark.yml').write_text('''name: Paper benchmark on gpuserver6000
+
+on:
+  workflow_dispatch:
+    inputs:
+      repetitions:
+        description: Number of benchmark repetitions
+        required: true
+        default: '30'
+        type: string
+      seed:
+        description: Random seed
+        required: true
+        default: '1'
+        type: string
 
 concurrency:
   group: paper-benchmark-gpuserver6000
@@ -53,35 +257,61 @@ jobs:
           consecutive=0
           while [ "${consecutive}" -lt 3 ]; do
             read -r load_one load_five load_fifteen _ < /proc/loadavg
-            if awk -v one="${load_one}" -v five="${load_five}" \
+            if awk -v one="${load_one}" -v five="${load_five}" \\
               'BEGIN { exit !(one < 2.0 && five < 3.0) }'; then
               consecutive=$((consecutive + 1))
             else
               consecutive=0
             fi
-            printf 'idle gate %s/3 load=%s,%s,%s %s\n' \
+            printf 'idle gate %s/3 load=%s,%s,%s %s\\n' \\
               "${consecutive}" "${load_one}" "${load_five}" "${load_fifteen}" "$(date --iso-8601=seconds)"
             sleep 60
           done
 
       - name: Run main paper benchmark
         run: |
-          python scripts/run_smoothing_evaluation.py \
-            --output-dir paper_benchmark/results \
-            --repetitions '${{ inputs.repetitions }}' \
+          python scripts/run_smoothing_evaluation.py \\
+            --output-dir paper_benchmark/results \\
+            --repetitions '${{ inputs.repetitions }}' \\
             --seed '${{ inputs.seed }}'
 
       - name: Generate benchmark figures and table
         run: |
-          python scripts/plot_paper_results.py \
-            --results-dir paper_benchmark/results \
+          python scripts/plot_paper_results.py \\
+            --results-dir paper_benchmark/results \\
             --figures-dir paper_benchmark/figures
-          python scripts/plot_runtime_accuracy_column.py \
-            --results-dir paper_benchmark/results \
+          python scripts/plot_runtime_accuracy_column.py \\
+            --results-dir paper_benchmark/results \\
             --figures-dir paper_benchmark/figures
-          python scripts/write_latex_tables.py \
-            --results-dir paper_benchmark/results \
+          python scripts/write_latex_tables.py \\
+            --results-dir paper_benchmark/results \\
             --tables-dir paper_benchmark/tables
+
+      - name: Record output checksums
+        run: |
+          find paper_benchmark -type f ! -name SHA256SUMS -print0 \\
+            | sort -z \\
+            | xargs -0 sha256sum \\
+            > paper_benchmark/SHA256SUMS
+
+      - name: Upload final benchmark bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: fourier-smoothing-gpuserver6000-benchmark
+          path: paper_benchmark/**
+          if-no-files-found: error
+          retention-days: 90
+''', encoding='utf-8')
+          PY
+
+      - name: Commit refreshed public timing evidence
+        if: github.event_name == 'pull_request'
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add paper_evidence .github/workflows/paper-benchmark.yml
+          git commit -m 'Refresh controlled timings on final implementation'
+          git push origin HEAD:agent/refresh-final-timings
 
       - name: Record output checksums
         run: |
@@ -93,7 +323,7 @@ jobs:
       - name: Upload final benchmark bundle
         uses: actions/upload-artifact@v4
         with:
-          name: fourier-smoothing-gpuserver6000-benchmark
+          name: fourier-smoothing-gpuserver6000-benchmark-final-release
           path: paper_benchmark/**
           if-no-files-found: error
           retention-days: 90
