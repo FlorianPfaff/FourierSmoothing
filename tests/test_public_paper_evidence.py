@@ -88,17 +88,26 @@ def test_public_paper_evidence_provenance_gain_and_checksums():
     metadata = json.loads(
         (EVIDENCE / "smoothing_evaluation_metadata.json").read_text(encoding="utf-8")
     )
-    assert metadata["schema_version"] == 3
-    assert metadata["evaluation_mode"] == "corrected_errors_with_reused_controlled_timings"
+    assert metadata["schema_version"] == 4
+    assert metadata["evaluation_mode"] == "final_release_split_accuracy_timing"
     assert metadata["combined_raw_data"]["join_key"] == ["method", "parameter", "repetition"]
     assert metadata["timing_generation"]["generated_columns"] == ["runtime_s"]
+    assert metadata["timing_generation"]["implementation_git_commit"] == metadata[
+        "timing_generation"
+    ]["git_commit"]
+    assert metadata["runtime_scope"]["included"] == [
+        "forward filter",
+        "backward smoother",
+    ]
+
     public = metadata["public_evidence"]
     assert public["repository"] == "FlorianPfaff/FourierSmoothing"
     assert public["path"] == "paper_evidence"
     for key in (
         "accuracy_raw",
-        "accuracy_summary",
-        "accuracy_regeneration_environment",
+        "summary",
+        "combined_raw",
+        "timing_raw",
         "gain_raw",
         "gain_summary",
         "reference_first_moments",
