@@ -1,0 +1,107 @@
+\definecolor{fsblue}{HTML}{0072B2}
+\definecolor{fsorange}{HTML}{E69F00}
+\definecolor{fsgreen}{HTML}{009E73}
+\definecolor{fsvermillion}{HTML}{D55E00}
+\definecolor{fsgridmajor}{HTML}{B9B9B9}
+\definecolor{fsgridminor}{HTML}{DDDDDD}
+\pgfplotsset{
+  fsaxis/.style={
+    xmode=log,
+    ymode=log,
+    width=0.445\textwidth,
+    height=5.25cm,
+    grid=major,
+    major grid style={color=fsgridmajor, line width=0.35pt},
+    minor grid style={color=fsgridminor, line width=0.25pt},
+    axis line style={color=black!72, line width=0.55pt},
+    tick style={color=black!72, line width=0.55pt},
+    tick align=outside,
+    minor tick num=1,
+    label style={font=\scriptsize},
+    tick label style={font=\scriptsize},
+    title style={font=\footnotesize\bfseries, yshift=-1pt},
+    every axis plot/.append style={mark size=2.05pt, line width=1.05pt},
+    error bars/error bar style={line width=0.50pt, opacity=0.62},
+    error bars/error mark options={mark size=1.15pt, line width=0.50pt, opacity=0.62},
+    legend style={
+      font=\scriptsize,
+      draw=none,
+      fill=none,
+      legend columns=4,
+      /tikz/every even column/.append style={column sep=0.75em},
+      row sep=-1pt,
+    },
+    legend image post style={xscale=0.90},
+    clip marker paths=true,
+  },
+  figfanstyle/.style={color=fsblue, mark=*, solid},
+  figfdnstyle/.style={
+    color=fsorange,
+    mark=square*,
+    dashed,
+    mark options={fill=white, draw=fsorange, line width=0.65pt},
+  },
+  pfstyle/.style={color=fsgreen, mark=triangle*, dash dot},
+  pwcstyle/.style={
+    color=fsvermillion,
+    mark=diamond*,
+    densely dotted,
+    mark options={fill=white, draw=fsvermillion, line width=0.65pt},
+  },
+}
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={group size=2 by 1, horizontal sep=1.10cm},
+  fsaxis,
+]
+\nextgroupplot[
+  title={(a) Mean-direction error},
+  xlabel={grid points $L$ / particles $N$},
+  ylabel={mean error / rad},
+  axis x line*=bottom,
+  axis y line*=left,
+  xmin=12,
+  xmax=12000,
+  ymin=2.5e-4,
+  ymax=8e-2,
+  legend to name=fsaccuracylegend,
+]
+\addplot+[figfanstyle]
+ table[x=n,y=mean_error] {figures/data/smoothing_evaluation_figfan.dat};
+\addlegendentry{FIGFAN}
+\addplot+[figfdnstyle]
+ table[x=n,y=mean_error] {figures/data/smoothing_evaluation_figfdn.dat};
+\addlegendentry{FIGFDN}
+\addplot+[pfstyle,error bars/.cd,y dir=both,y explicit]
+ table[x=n,y=mean_error,y error minus=mean_error_err_low,y error plus=mean_error_err_high]
+ {figures/data/smoothing_evaluation_pf.dat};
+\addlegendentry{PF}
+\addplot+[pwcstyle]
+ table[x=n,y=mean_error] {figures/data/smoothing_evaluation_pwc.dat};
+\addlegendentry{PWC}
+
+\nextgroupplot[
+  title={(b) $L^1$ reference discrepancy},
+  xlabel={grid points $L$ / particles $N$},
+  ylabel={mean $L^1$ discrepancy},
+  axis x line*=bottom,
+  axis y line*=right,
+  yticklabel pos=right,
+  xmin=12,
+  xmax=12000,
+  ymin=8e-5,
+  ymax=6e-1,
+]
+\addplot+[figfanstyle]
+ table[x=n,y=l1_error] {figures/data/smoothing_evaluation_figfan.dat};
+\addplot+[figfdnstyle]
+ table[x=n,y=l1_error] {figures/data/smoothing_evaluation_figfdn.dat};
+\addplot+[pfstyle,error bars/.cd,y dir=both,y explicit]
+ table[x=n,y=l1_error,y error minus=l1_error_err_low,y error plus=l1_error_err_high]
+ {figures/data/smoothing_evaluation_pf.dat};
+\addplot+[pwcstyle]
+ table[x=n,y=l1_error] {figures/data/smoothing_evaluation_pwc.dat};
+\end{groupplot}
+\path (group c1r1.south west) -- (group c2r1.south east)
+  node[midway, below=8.5mm] {\ref{fsaccuracylegend}};
+\end{tikzpicture}

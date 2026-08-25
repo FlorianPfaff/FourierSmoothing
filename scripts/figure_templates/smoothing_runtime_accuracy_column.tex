@@ -1,0 +1,138 @@
+\definecolor{fsblue}{HTML}{0072B2}
+\definecolor{fsorange}{HTML}{E69F00}
+\definecolor{fsgreen}{HTML}{009E73}
+\definecolor{fsvermillion}{HTML}{D55E00}
+\definecolor{fsgridmajor}{HTML}{B9B9B9}
+\pgfplotsset{
+  fscolumnaxis/.style={
+    width=0.96\columnwidth,
+    height=3.00cm,
+    xmode=log,
+    ymode=log,
+    grid=major,
+    major grid style={color=fsgridmajor, line width=0.35pt},
+    axis x line*=bottom,
+    axis y line*=left,
+    axis line style={color=black!72, line width=0.55pt},
+    tick style={color=black!72, line width=0.55pt},
+    tick align=outside,
+    label style={font=\scriptsize},
+    tick label style={font=\scriptsize},
+    every axis plot/.append style={mark size=1.95pt, line width=1.0pt},
+    error bars/error bar style={line width=0.48pt, opacity=0.62},
+    error bars/error mark options={mark size=1.05pt, line width=0.48pt, opacity=0.62},
+    legend style={
+      font=\scriptsize,
+      draw=none,
+      fill=white,
+      fill opacity=0.82,
+      text opacity=1,
+      inner sep=1.2pt,
+      row sep=-1pt,
+      /tikz/every even column/.append style={column sep=0.55em},
+    },
+    legend image post style={xscale=0.86},
+    clip marker paths=true,
+  },
+  figfstyle/.style={color=fsblue, mark=*, solid},
+  figfanstyle/.style={color=fsblue, mark=*, solid},
+  figfdnstyle/.style={
+    color=fsorange,
+    mark=square*,
+    dashed,
+    mark options={fill=white, draw=fsorange, line width=0.62pt},
+  },
+  pfstyle/.style={color=fsgreen, mark=triangle*, dash dot},
+  pwcstyle/.style={
+    color=fsvermillion,
+    mark=diamond*,
+    densely dotted,
+    mark options={fill=white, draw=fsvermillion, line width=0.62pt},
+  },
+}
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={group size=1 by 3, vertical sep=0.96cm},
+  fscolumnaxis,
+]
+\nextgroupplot[
+  xlabel={grid points $L$ / particles $N$},
+  ylabel={median runtime / ms},
+  xmin=12,
+  xmax=12000,
+  ymin=0.8,
+  ymax=200,
+  legend style={at={(0.02,0.82)}, anchor=north west, legend columns=3},
+]
+\addplot+[figfstyle,error bars/.cd,y dir=both,y explicit]
+ table[x=n,y=runtime_median_ms,y error plus=runtime_err_high_ms,y error minus=runtime_err_low_ms]
+ {figures/data/smoothing_evaluation_figfan.dat};
+\addlegendentry{FIGF}
+\addplot+[pfstyle,error bars/.cd,y dir=both,y explicit]
+ table[x=n,y=runtime_median_ms,y error plus=runtime_err_high_ms,y error minus=runtime_err_low_ms]
+ {figures/data/smoothing_evaluation_pf.dat};
+\addlegendentry{PF}
+\addplot+[pwcstyle,error bars/.cd,y dir=both,y explicit]
+ table[x=n,y=runtime_median_ms,y error plus=runtime_err_high_ms,y error minus=runtime_err_low_ms]
+ {figures/data/smoothing_evaluation_pwc.dat};
+\addlegendentry{PWC}
+\node[anchor=north west,font=\footnotesize\bfseries,fill=white,fill opacity=0.82,text opacity=1,inner sep=1pt]
+  at (rel axis cs:0.015,0.985) {(a)};
+
+\nextgroupplot[
+  ylabel={mean error / rad},
+  xmin=0.8,
+  xmax=200,
+  ymin=2.5e-4,
+  ymax=8e-2,
+  xticklabels=\empty,
+  legend to name=fsaccuracyruntimelegend,
+  legend columns=4,
+]
+\addplot+[figfanstyle,error bars/.cd,x dir=both,x explicit]
+ table[x=runtime_median_ms,y=mean_error,x error plus=runtime_err_high_ms,x error minus=runtime_err_low_ms]
+ {figures/data/smoothing_evaluation_figfan.dat};
+\addlegendentry{FIGFAN}
+\addplot+[figfdnstyle,error bars/.cd,x dir=both,x explicit]
+ table[x=runtime_median_ms,y=mean_error,x error plus=runtime_err_high_ms,x error minus=runtime_err_low_ms]
+ {figures/data/smoothing_evaluation_figfdn.dat};
+\addlegendentry{FIGFDN}
+\addplot+[pfstyle,error bars/.cd,x dir=both,x explicit,y dir=both,y explicit]
+ table[x=runtime_median_ms,y=mean_error,x error plus=runtime_err_high_ms,x error minus=runtime_err_low_ms,
+       y error plus=mean_error_err_high,y error minus=mean_error_err_low]
+ {figures/data/smoothing_evaluation_pf.dat};
+\addlegendentry{PF}
+\addplot+[pwcstyle,error bars/.cd,x dir=both,x explicit]
+ table[x=runtime_median_ms,y=mean_error,x error plus=runtime_err_high_ms,x error minus=runtime_err_low_ms]
+ {figures/data/smoothing_evaluation_pwc.dat};
+\addlegendentry{PWC}
+\node[anchor=north west,font=\footnotesize\bfseries,fill=white,fill opacity=0.82,text opacity=1,inner sep=1pt]
+  at (rel axis cs:0.015,0.985) {(b)};
+
+\nextgroupplot[
+  xlabel={median runtime / ms},
+  ylabel={mean $L^1$ discrepancy},
+  xmin=0.8,
+  xmax=200,
+  ymin=8e-5,
+  ymax=6e-1,
+]
+\addplot+[figfanstyle,error bars/.cd,x dir=both,x explicit]
+ table[x=runtime_median_ms,y=l1_error,x error plus=runtime_err_high_ms,x error minus=runtime_err_low_ms]
+ {figures/data/smoothing_evaluation_figfan.dat};
+\addplot+[figfdnstyle,error bars/.cd,x dir=both,x explicit]
+ table[x=runtime_median_ms,y=l1_error,x error plus=runtime_err_high_ms,x error minus=runtime_err_low_ms]
+ {figures/data/smoothing_evaluation_figfdn.dat};
+\addplot+[pfstyle,error bars/.cd,x dir=both,x explicit,y dir=both,y explicit]
+ table[x=runtime_median_ms,y=l1_error,x error plus=runtime_err_high_ms,x error minus=runtime_err_low_ms,
+       y error plus=l1_error_err_high,y error minus=l1_error_err_low]
+ {figures/data/smoothing_evaluation_pf.dat};
+\addplot+[pwcstyle,error bars/.cd,x dir=both,x explicit]
+ table[x=runtime_median_ms,y=l1_error,x error plus=runtime_err_high_ms,x error minus=runtime_err_low_ms]
+ {figures/data/smoothing_evaluation_pwc.dat};
+\node[anchor=north west,font=\footnotesize\bfseries,fill=white,fill opacity=0.82,text opacity=1,inner sep=1pt]
+  at (rel axis cs:0.015,0.985) {(c)};
+\end{groupplot}
+\path (group c1r3.south west) -- (group c1r3.south east)
+  node[midway, below=8.2mm] {\ref{fsaccuracyruntimelegend}};
+\end{tikzpicture}
