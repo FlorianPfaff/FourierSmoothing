@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Create the paper's space-time smoothing illustration."""
+"""Create a publication-sized space-time smoothing illustration for the paper."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from fourier_smoothing import (
 
 TEX_PT_PER_IN = 72.27
 IEEE_TEXTWIDTH_PT = 516.0
-FULL_WIDTH_IN = IEEE_TEXTWIDTH_PT / TEX_PT_PER_IN
+FULL_WIDTH_FIGURE_IN = IEEE_TEXTWIDTH_PT / TEX_PT_PER_IN
 
 
 def parse_args() -> argparse.Namespace:
@@ -145,20 +145,29 @@ def _plot_space_time_smoothing(
     output_base: Path,
     formats: list[str],
 ) -> list[Path]:
+    import matplotlib.patheffects as path_effects  # pylint: disable=import-outside-toplevel
     import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
 
     _configure_paper_style(plt)
     panels = [
-        (r"Filtered $p(x_t\mid z_{0:t})$", _column_normalize(_center_state_axis(filtered)), filtered),
-        (r"Future evidence $\beta_t(x_t)$", _column_normalize(_center_state_axis(backward)), None),
-        (r"Smoothed $p(x_t\mid z_{0:T})$", _column_normalize(_center_state_axis(smoothed)), smoothed),
+        ("(a) Filtered density", _column_normalize(filtered), filtered),
+        ("(b) Backward information", _column_normalize(backward), None),
+        ("(c) Smoothed density", _column_normalize(smoothed), smoothed),
     ]
     time_steps = filtered.shape[0]
-    extent = (-0.5, time_steps - 0.5, -np.pi, np.pi)
+    extent = (-0.5, time_steps - 0.5, 0.0, 2.0 * np.pi)
 
-    fig, axes = plt.subplots(1, 3, figsize=(FULL_WIDTH_IN, 2.42), sharey=True)
+    fig, axes = plt.subplots(
+        1,
+        3,
+        figsize=(FULL_WIDTH_FIGURE_IN, 2.48),
+        sharex=True,
+        sharey=True,
+    )
+    fig.subplots_adjust(left=0.078, right=0.918, bottom=0.20, top=0.86, wspace=0.075)
+
     image = None
-    for panel_ix, (ax, (title, values, mean_source)) in enumerate(zip(axes, panels)):
+    for ax, (title, values, mean_source) in zip(axes, panels):
         image = ax.imshow(
             values.T,
             origin="lower",
@@ -171,35 +180,35 @@ def _plot_space_time_smoothing(
             rasterized=True,
         )
         if mean_source is not None:
-            _plot_circular_mean(ax, mean_source)
-        ax.set_xlim(-0.5, time_steps - 0.5)
-        ax.set_xticks(_time_ticks(time_steps))
-        ax.set_xlabel("time step")
-        ax.tick_params(axis="both", which="major", length=2.7, width=0.7, pad=1.5)
+            mean_line = _plot_circular_mean(ax, mean_source)
+            mean_line.set_path_effects(
+                [path_effects.Stroke(linewidth=2.25, foreground="black", alpha=0.58), path_effects.Normal()]
+            )
+        ax.set_title(title, pad=4.0)
+        ax.set_xlim(extent[0], extent[1])
+        ax.set_ylim(extent[2], extent[3])
+        ax.tick_params(axis="both", which="major", length=3.0, width=0.70, pad=1.6)
         for spine in ax.spines.values():
-            spine.set_linewidth(0.75)
-        ax.text(
-            0.5,
-            -0.27,
-            f"({chr(ord('a') + panel_ix)}) {title}",
-            transform=ax.transAxes,
-            ha="center",
-            va="top",
-            fontsize=7.25,
-            clip_on=False,
-        )
+            spine.set_color("0.35")
+            spine.set_linewidth(0.70)
 
-    axes[0].set_ylabel(r"angle $x_t$")
-    axes[0].set_yticks([-np.pi, 0.0, np.pi])
-    axes[0].set_yticklabels([r"$-\pi$", "0", r"$\pi$"])
+    tick_step = max(1, int(np.ceil(time_steps / 5)))
+    xticks = np.arange(0, time_steps, tick_step, dtype=int)
+    if xticks[-1] != time_steps - 1:
+        xticks = np.append(xticks, time_steps - 1)
+    for ax in axes:
+        ax.set_xticks(xticks)
+
+    axes[0].set_ylabel("angle")
+    axes[0].set_yticks([0.0, np.pi, 2.0 * np.pi])
+    axes[0].set_yticklabels(["0", r"$\pi$", r"$2\pi$"])
+    fig.text(0.497, 0.075, "time step", ha="center", va="center", fontsize=8.0)
 
     assert image is not None
-    fig.subplots_adjust(left=0.07, right=0.90, top=0.975, bottom=0.31, wspace=0.075)
-    colorbar_axis = fig.add_axes([0.918, 0.19, 0.014, 0.70])
-    colorbar = fig.colorbar(image, cax=colorbar_axis)
-    colorbar.set_label("relative intensity", fontsize=7.5, labelpad=3.0)
-    colorbar.set_ticks([0.0, 0.5, 1.0])
-    colorbar.ax.tick_params(labelsize=6.7, length=2.4, width=0.65, pad=1.5)
+    colorbar_axis = fig.add_axes((0.934, 0.235, 0.013, 0.565))
+    colorbar = fig.colorbar(image, cax=colorbar_axis, ticks=[0.0, 0.5, 1.0])
+    colorbar.set_label("within-column contrast", labelpad=3.0)
+    colorbar.ax.tick_params(labelsize=6.8, length=2.5, width=0.65, pad=1.4)
     colorbar.outline.set_linewidth(0.65)
 
     written = []
@@ -218,21 +227,16 @@ def _configure_paper_style(plt) -> None:
             "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
             "mathtext.fontset": "stix",
             "font.size": 8.0,
-            "axes.labelsize": 7.8,
-            "xtick.labelsize": 6.9,
-            "ytick.labelsize": 6.9,
-            "axes.linewidth": 0.75,
+            "axes.labelsize": 8.0,
+            "axes.titlesize": 8.1,
+            "axes.titleweight": "semibold",
+            "xtick.labelsize": 6.8,
+            "ytick.labelsize": 6.8,
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
             "savefig.dpi": 300,
         }
     )
-
-
-def _center_state_axis(values: np.ndarray) -> np.ndarray:
-    """Reorder a [0, 2pi) grid to the visually continuous [-pi, pi) axis."""
-
-    return np.fft.fftshift(np.asarray(values), axes=1)
 
 
 def _column_normalize(values: np.ndarray) -> np.ndarray:
@@ -243,34 +247,28 @@ def _column_normalize(values: np.ndarray) -> np.ndarray:
     return arr / maxima
 
 
-def _plot_circular_mean(ax, density: np.ndarray) -> None:
+def _plot_circular_mean(ax, density: np.ndarray):
     grid_size = density.shape[1]
     angles = np.linspace(0.0, 2.0 * np.pi, grid_size, endpoint=False)
     moments = np.sum(density * np.exp(1j * angles)[None, :], axis=1)
-    means = np.angle(moments)
+    means = np.mod(np.angle(moments), 2.0 * np.pi)
     times = np.arange(density.shape[0], dtype=float)
     plot_times, plot_means = _break_wrapped_line(times, means)
-    ax.plot(plot_times, plot_means, color="black", linewidth=2.0, alpha=0.55, zorder=5)
-    ax.plot(plot_times, plot_means, color="white", linewidth=1.05, alpha=0.98, zorder=6)
+    (line,) = ax.plot(plot_times, plot_means, color="white", linewidth=1.25, alpha=0.98)
+    return line
 
 
 def _break_wrapped_line(times: np.ndarray, angles: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     plot_times = [times[0]]
     plot_angles = [angles[0]]
-    for previous_time, current_time, previous_angle, current_angle in zip(times[:-1], times[1:], angles[:-1], angles[1:]):
+    wrapped_pairs = zip(times[:-1], times[1:], angles[:-1], angles[1:])
+    for previous_time, current_time, previous_angle, current_angle in wrapped_pairs:
         if abs(current_angle - previous_angle) > np.pi:
-            midpoint = (previous_time + current_time) / 2.0
-            plot_times.extend([midpoint, midpoint])
+            plot_times.extend([(previous_time + current_time) / 2.0, (previous_time + current_time) / 2.0])
             plot_angles.extend([np.nan, np.nan])
         plot_times.append(current_time)
         plot_angles.append(current_angle)
     return np.asarray(plot_times), np.asarray(plot_angles)
-
-
-def _time_ticks(time_steps: int) -> list[int]:
-    if time_steps <= 6:
-        return list(range(time_steps))
-    return sorted(set(np.linspace(0, time_steps - 1, 5, dtype=int).tolist()))
 
 
 if __name__ == "__main__":
