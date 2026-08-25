@@ -145,6 +145,15 @@ def main() -> None:
                 ],
                 repository_root,
             )
+            _run(
+                [
+                    sys.executable,
+                    "scripts/write_publication_plot_sources.py",
+                    "--figures-dir",
+                    str(figures_dir),
+                ],
+                repository_root,
+            )
     if not args.skip_hero:
         _run(
             [
