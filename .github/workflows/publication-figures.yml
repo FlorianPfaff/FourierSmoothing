@@ -1,0 +1,63 @@
+name: Publication figure checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/paper_plot_style.py'
+      - 'scripts/render_publication_figures.py'
+      - 'scripts/plot_runtime_accuracy_column.py'
+      - 'scripts/plot_smoothing_hero.py'
+      - 'tests/test_s3f_publication_renderer.py'
+      - 'pyproject.toml'
+      - '.github/workflows/publication-figures.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'tests/test_s3f_publication_renderer.py'
+      - 'pyproject.toml'
+      - '.github/workflows/publication-figures.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publication-figures-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MPLBACKEND: Agg
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install paper and test dependencies
+        run: python -m pip install -e '.[paper]'
+      - name: Test algorithms, legacy artifacts, and new publication renderer
+        run: python -m pytest -q
+      - name: Render frozen numerical evidence without rerunning experiments
+        run: |
+          python scripts/render_publication_figures.py --results-dir paper_evidence --figures-dir publication_preview
+          git diff --exit-code -- paper_evidence
+      - name: Upload previews and reproducible source snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publication-figures-and-source
+          path: |
+            publication_preview/
+            scripts/
+            src/
+            tests/
+            paper_evidence/
+            pyproject.toml
+            README.md
+          if-no-files-found: error
+          retention-days: 30
