@@ -15,12 +15,12 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-import fitz
+import pymupdf as fitz
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from paper_plot_style import (TEXT_WIDTH, COLUMN_WIDTH, METHODS, DRAW_ORDER,
+from paper_plot_style import (TEXT_WIDTH, COLUMN_WIDTH, DRAW_ORDER,
                               COLORS, configure, line_style, style_axis, legend_handles)
 from plot_runtime_accuracy_column import _read_rows, _read_reference_diagnostics
 
@@ -180,7 +180,8 @@ def hero(target: Path, directory: Path) -> None:
         page.show_pdf_page(source[0].rect, source, 0)
         fig = plt.figure(figsize=(TEXT_WIDTH, 27 / 72))
         cax = fig.add_axes([0.34, 0.60, 0.32, 0.22])
-        fig.colorbar(image, cax=cax, orientation="horizontal", ticks=[0, 0.5, 1])
+        fig.colorbar(plt.cm.ScalarMappable(norm=image.norm, cmap=image.cmap),
+                     cax=cax, orientation="horizontal", ticks=[0, 0.5, 1])
         cax.tick_params(length=2, labelsize=7, pad=1)
         fig.text(0.32, 0.68, "within-column contrast", ha="right", va="center", fontsize=7)
         scale = directory / "hero-scale.pdf"
@@ -224,7 +225,7 @@ def main() -> None:
         directory = Path(temporary)
         for name, indices, titles in [
             ("smoothing_accuracy_by_parameter", [1, 2], ["(a) Mean-direction error", r"(b) $L^1$ reference discrepancy"]),
-            ("smoothing_runtime_accuracy_summary", [0, 3, 4], ["(a) Runtime scaling (FIGF shared)", "(b) Mean-direction error", r"(c) $L^1$ reference discrepancy"]),
+            ("smoothing_runtime_accuracy_summary", [0, 3, 4], ["(a) Runtime scaling", "(b) Mean-direction error", r"(c) $L^1$ reference discrepancy"]),
         ]:
             width = (TEXT_WIDTH - 0.14 * (len(indices) - 1)) / len(indices)
             panels = []
@@ -242,7 +243,7 @@ def main() -> None:
     if hashes != {path.name: digest(path) for path in inputs}:
         raise RuntimeError("Rendering changed numerical inputs")
     try:
-        revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[1], text=True).strip()
+        revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[1], text=True, stderr=subprocess.DEVNULL).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         revision = "unknown"
     manifest = {"schema_version": 1, "renderer_commit": revision,
