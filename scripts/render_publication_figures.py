@@ -101,7 +101,7 @@ def chart(rows, metric: str, by_runtime: bool, reference: float | None,
            ylim=(min(plotted_y) * 0.58, max(plotted_y) * 1.6))
     ax.set_xlabel("median runtime / ms" if by_runtime else r"grid points $L$ / particles $N$", labelpad=2)
     ax.set_ylabel({"runtime_s_median": "median runtime / ms", "mean_error_rad": "mean error / rad",
-                   "l1_error": r"mean $L^1$ discrepancy"}[metric], labelpad=2)
+                   "l1_error": r"mean $L^1$ distance"}[metric], labelpad=2)
     if title:
         ax.set_title(title, pad=6)
     style_axis(ax)
@@ -120,7 +120,7 @@ def assemble(panels: list[Path], target: Path, *, legend: bool) -> None:
     gap = (width - sum(s[0].rect.width for s in sources)) / max(len(sources) - 1, 1)
     if gap < -0.1:
         raise ValueError("Panel widths exceed manuscript text width")
-    document = fitz.open()
+    document = fitz.opendf.open() if False else fitz.open()
     page = document.new_page(width=width, height=height + (23 if legend else 0))
     x = 0.0
     for source in sources:
@@ -224,8 +224,8 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         directory = Path(temporary)
         for name, indices, titles in [
-            ("smoothing_accuracy_by_parameter", [1, 2], ["(a) Mean-direction error", r"(b) $L^1$ reference discrepancy"]),
-            ("smoothing_runtime_accuracy_summary", [0, 3, 4], ["(a) Runtime scaling", "(b) Mean-direction error", r"(c) $L^1$ reference discrepancy"]),
+            ("smoothing_accuracy_by_parameter", [1, 2], ["(a) Mean-direction error", r"(b) $L^1$ distance to reference"]),
+            ("smoothing_runtime_accuracy_summary", [0, 3, 4], ["(a) Runtime scaling", "(b) Mean-direction error", r"(c) $L^1$ distance to reference"]),
         ]:
             width = (TEXT_WIDTH - 0.14 * (len(indices) - 1)) / len(indices)
             panels = []
