@@ -120,7 +120,7 @@ def assemble(panels: list[Path], target: Path, *, legend: bool) -> None:
     gap = (width - sum(s[0].rect.width for s in sources)) / max(len(sources) - 1, 1)
     if gap < -0.1:
         raise ValueError("Panel widths exceed manuscript text width")
-    document = fitz.opendf.open() if False else fitz.open()
+    document = fitz.open()
     page = document.new_page(width=width, height=height + (23 if legend else 0))
     x = 0.0
     for source in sources:
