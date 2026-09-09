@@ -1,4 +1,7 @@
-"""LaTeX table writers for Fourier smoothing paper result CSV files."""
+"""LaTeX table writers for Fourier smoothing paper result CSV files.
+
+Generated tables require booktabs and siunitx v3 in the document preamble.
+"""
 
 from __future__ import annotations
 
@@ -88,7 +91,7 @@ def _identity_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="lrrrr",
-        header=["Method", "Grid Size", "Runtime [s]", "Max. Diff.", "Norm. Err."],
+        header=["Method", "Grid Size", r"Runtime [\unit{\second}]", "Max. Diff.", "Norm. Err."],
         rows=body,
         caption_comment="Identity-torus smoother benchmark summary.",
     )
@@ -138,7 +141,7 @@ def _particle_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="rrrrr",
-        header=["Particles", "Trajectories", "Runtime [s]", "Mean Err. [rad]", "Max. Err. [rad]"],
+        header=["Particles", "Trajectories", r"Runtime [\unit{\second}]", r"Mean Err. [\unit{\radian}]", r"Max. Err. [\unit{\radian}]"],
         rows=body,
         caption_comment="Particle smoother baseline summary.",
     )
@@ -163,7 +166,7 @@ def _figf_pwc_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="lrrrr",
-        header=["Method", "Grid Size", "Runtime [s]", "Mean $L^1$", "Max. $L^1$"],
+        header=["Method", "Grid Size", r"Runtime [\unit{\second}]", "Mean $L^1$", "Max. $L^1$"],
         rows=body,
         caption_comment="FIGF/PWC reconstruction benchmark summary.",
     )
@@ -183,7 +186,7 @@ def _smoothing_summary_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="lrrrr",
-        header=["Method", "Parameter", "Runtime [s]", "Mean Err. [rad]", "$L^1$ Err."],
+        header=["Method", "Parameter", r"Runtime [\unit{\second}]", r"Mean Err. [\unit{\radian}]", "$L^1$ Err."],
         rows=body,
         caption_comment="Main smoothing evaluation summary.",
     )
@@ -208,7 +211,7 @@ def _smoothing_raw_table(rows: Sequence[Mapping[str, str]]) -> str:
         )
     return _tabular(
         columns="lrrrr",
-        header=["Method", "Parameter", "Runtime [s]", "Mean Err. [rad]", "$L^1$ Err."],
+        header=["Method", "Parameter", r"Runtime [\unit{\second}]", r"Mean Err. [\unit{\radian}]", "$L^1$ Err."],
         rows=body,
         caption_comment="Main smoothing evaluation summary generated from raw repetitions.",
     )
@@ -243,12 +246,13 @@ def _smoothing_gain_table(rows: Sequence[Mapping[str, str]]) -> str:
         r"\scriptsize",
         (
             r"\caption{Circular state-estimation MAE before and after smoothing over "
-            f"{n_trials} simulated sequences. The reduction column reports a trial-bootstrap 95\\% CI.}}"
+            f"{n_trials} simulated sequences. The reduction column reports a trial-bootstrap "
+            r"\qty{95}{\percent} CI.}"
         ),
         r"\label{tab:smoothing-gain}",
         r"\begin{tabular}{lrrr}",
         r"\toprule",
-        "Horizon & Filter [rad] & Smoother [rad] & Reduction [\\%] \\\\",
+        r"Horizon & Filter [\unit{\radian}] & Smoother [\unit{\radian}] & Reduction [\unit{\percent}]" + LATEX_ROW_END,
         r"\midrule",
     ]
     lines.extend(" & ".join(row) + LATEX_ROW_END for row in body)
