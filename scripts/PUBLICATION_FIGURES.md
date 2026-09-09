@@ -28,12 +28,24 @@ not rerun experiments, estimate new runtimes, change a statistic, or write
 numerical results. The space-time illustration reuses the existing illustrative
 case and its original parameters; it is not a new benchmark.
 
-Eight PDFs and matching 300-dpi PNG previews are generated. The manuscript
-uses `smoothing_space_time.pdf`, `smoothing_accuracy_by_parameter.pdf`, and
-`smoothing_runtime_accuracy_summary.pdf` at full text width. Five individual
-charts are also generated at column width. Each panel is rendered at its actual
-printed dimensions before vector-PDF assembly; do not shrink the three-panel
-runtime comparison into a single column.
+To update only the space-time illustration while preserving the accuracy and
+runtime PDFs and their manifest metadata, add `--only-space-time` to the command
+above. This requires an existing manifest whose input and PDF hashes still match.
+
+Eleven PDFs and matching 300-dpi PNG previews are generated. The space-time
+panels are `smoothing_space_time_filtering.pdf`,
+`smoothing_space_time_backward.pdf`, and `smoothing_space_time_smoothing.pdf`.
+Each is rendered at `0.32\textwidth`, with a horizontal colorbar labeled
+"relative value" above the heatmap. Panel captions and labels belong to LaTeX;
+no panel titles are embedded in the images. `smoothing_space_time.pdf` remains
+as a combined preview. The angular range remains zero to two pi, and white
+circular-mean traces remain on the filtering and smoothing panels only.
+
+The remaining outputs are five column-sized comparison plots and two combined
+previews. The manuscript includes the two accuracy panels at column width and
+the three runtime panels at `0.32\textwidth`. After a full rendering pass, run
+`python scripts/render_runtime_subfigures.py` in the paper repository to restore
+its final-size runtime fonts. The space-time-only mode preserves this override.
 
 Accuracy coordinates remain arithmetic means with PF IQRs. Runtimes remain
 medians with IQRs. Interval endpoints are drawn directly, including the valid
@@ -46,9 +58,9 @@ bounds on intrinsic method error.
 `publication_manifest.json` records the renderer revision, numerical-input
 hashes, generated-PDF hashes, and all plotted summary rows. The paper repository
 validates those rows independently against the existing numerical `.dat`
-tables. Its workflow pins the reviewed renderer commit and the rendering
-package versions, compiles and validates the manuscript, then commits the PDFs,
-previews, and manifest on successful pushes to `main`.
+tables. The `space_time_subfigures` profile also records source-file hashes,
+panel dimensions, and the unchanged illustrative-case parameters. Figure
+regeneration and validation are manual; manuscript compilation is in Overleaf.
 
 The older `plot_paper_results.py`, `plot_runtime_accuracy_column.py`, and
 `plot_smoothing_hero.py` entry points are retained for historical reproduction.

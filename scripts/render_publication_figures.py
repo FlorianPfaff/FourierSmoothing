@@ -25,6 +25,13 @@ from paper_plot_style import (TEXT_WIDTH, COLUMN_WIDTH, DRAW_ORDER,
 from plot_runtime_accuracy_column import _read_rows, _read_reference_diagnostics
 
 
+SPACE_TIME_PANELS = ("filtering", "backward", "smoothing")
+SPACE_TIME_WIDTH = 0.32 * TEXT_WIDTH
+SPACE_TIME_HEIGHT = 2.5
+SPACE_TIME_CASE = dict(grid_size=255, time_steps=9, likelihood_sharpness=7.0,
+                       noise_concentration=2.2, prior_concentration=0.45)
+
+
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -146,60 +153,47 @@ def assemble(panels: list[Path], target: Path, *, legend: bool) -> None:
     preview(target)
 
 
-def hero(target: Path, directory: Path) -> None:
+def hero(target: Path) -> list[Path]:
     """Reuse the existing illustrative case without changing its model or data."""
     from plot_smoothing_hero import _make_smoothing_case, _column_normalize, _plot_circular_mean
     from matplotlib import patheffects
-    fields = _make_smoothing_case(grid_size=255, time_steps=9, likelihood_sharpness=7.0,
-                                 noise_concentration=2.2, prior_concentration=0.45)
+    fields = _make_smoothing_case(**SPACE_TIME_CASE)
     panels = []
-    width = (TEXT_WIDTH - 0.12) / 3
-    for index, (field, title) in enumerate(zip(fields, ["(a) Filtered density", "(b) Backward information", "(c) Smoothed density"])):
-        fig = plt.figure(figsize=(width, 2.18))
-        ax = fig.add_axes([0.37 / width, 0.40 / 2.18, (width - 0.47) / width, 1.51 / 2.18])
+    width, height = SPACE_TIME_WIDTH, SPACE_TIME_HEIGHT
+    for name, field in zip(SPACE_TIME_PANELS, fields):
+        fig = plt.figure(figsize=(width, height))
+        ax = fig.add_axes([0.42 / width, 0.40 / height, (width - 0.54) / width, 1.51 / height])
         image = ax.imshow(_column_normalize(field).T, origin="lower", aspect="auto",
                           extent=(-0.5, 8.5, 0, 2 * np.pi), cmap="viridis", vmin=0, vmax=1,
                           interpolation="nearest", rasterized=True)
-        if index != 1:
+        if name != "backward":
             line = _plot_circular_mean(ax, field)
             line.set_linewidth(1.1)
             line.set_path_effects([patheffects.Stroke(linewidth=1.9, foreground="black", alpha=0.55), patheffects.Normal()])
-        ax.set(title=title, xlabel="time step", xticks=[0, 2, 4, 6, 8],
+        ax.set(xlabel="time step", xticks=[0, 2, 4, 6, 8],
                yticks=[0, np.pi, 2 * np.pi], yticklabels=["0", r"$\pi$", r"$2\pi$"])
-        if index == 0:
-            ax.set_ylabel("angle / rad", labelpad=1)
+        ax.set_ylabel("angle / rad", labelpad=1)
         ax.tick_params(length=2.5, pad=2)
-        panel = directory / f"hero-{index}.pdf"
+        cax = fig.add_axes([0.42 / width, 2.03 / height, (width - 0.54) / width, 0.07 / height])
+        colorbar = fig.colorbar(image, cax=cax, orientation="horizontal", ticks=[0, 0.5, 1])
+        colorbar.set_label("relative value", labelpad=3)
+        cax.xaxis.set_label_position("top")
+        cax.xaxis.set_ticks_position("top")
+        cax.tick_params(length=2, pad=1.5)
+        panel = target.with_name(f"{target.stem}_{name}.pdf")
         save(fig, panel)
+        preview(panel)
         panels.append(panel)
     assemble(panels, target, legend=False)
-    # Add a compact, explicitly labeled color scale without shrinking the panels.
-    with fitz.open(target) as source:
-        document = fitz.open()
-        page = document.new_page(width=source[0].rect.width, height=source[0].rect.height + 27)
-        page.show_pdf_page(source[0].rect, source, 0)
-        fig = plt.figure(figsize=(TEXT_WIDTH, 27 / 72))
-        cax = fig.add_axes([0.34, 0.60, 0.32, 0.22])
-        fig.colorbar(plt.cm.ScalarMappable(norm=image.norm, cmap=image.cmap),
-                     cax=cax, orientation="horizontal", ticks=[0, 0.5, 1])
-        cax.tick_params(length=2, labelsize=7, pad=1)
-        fig.text(0.32, 0.68, "within-column contrast", ha="right", va="center", fontsize=7)
-        scale = directory / "hero-scale.pdf"
-        save(fig, scale)
-        with fitz.open(scale) as scale_pdf:
-            page.show_pdf_page(fitz.Rect(0, source[0].rect.height, source[0].rect.width,
-                                        source[0].rect.height + 27), scale_pdf, 0)
-        combined = directory / "hero-combined.pdf"
-        document.save(combined, garbage=4, deflate=True, no_new_id=True)
-        document.close()
-    target.write_bytes(combined.read_bytes())
-    preview(target)
+    return [*panels, target]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", type=Path, required=True)
     parser.add_argument("--figures-dir", type=Path, required=True)
+    parser.add_argument("--only-space-time", action="store_true",
+                        help="Update only the illustration and its manifest entries; require an existing manifest.")
     args = parser.parse_args()
     configure()
     inputs = [args.results_dir / "smoothing_evaluation_summary.csv", args.results_dir / "reference_stability.json"]
@@ -210,23 +204,31 @@ def main() -> None:
     reference_mean, reference_l1 = _read_reference_diagnostics(inputs[1])
     output = args.figures_dir
     output.mkdir(parents=True, exist_ok=True)
+    manifest_path = output / "publication_manifest.json"
+    if args.only_space_time:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest["schema_version"] != 1 or manifest["inputs_sha256"] != hashes:
+            raise ValueError("Existing publication manifest does not match the frozen inputs")
+        for name, checksum in manifest["pdf_sha256"].items():
+            if digest(output / name) != checksum:
+                raise ValueError(f"Existing figure does not match the manifest: {name}")
     jobs = [("smoothing_runtime_by_parameter", "runtime_s_median", False, None),
             ("smoothing_mean_error_by_parameter", "mean_error_rad", False, reference_mean),
             ("smoothing_l1_error_by_parameter", "l1_error", False, reference_l1),
             ("smoothing_mean_error_by_runtime", "mean_error_rad", True, reference_mean),
             ("smoothing_l1_error_by_runtime", "l1_error", True, reference_l1)]
     generated = []
-    for name, metric, runtime, reference in jobs:
+    for name, metric, runtime, reference in ([] if args.only_space_time else jobs):
         path = output / f"{name}.pdf"
         chart(rows, metric, runtime, reference, path, COLUMN_WIDTH, 2.45, own_legend=True)
         preview(path)
         generated.append(path)
     with tempfile.TemporaryDirectory() as temporary:
         directory = Path(temporary)
-        for name, indices, titles in [
+        for name, indices, titles in ([] if args.only_space_time else [
             ("smoothing_accuracy_by_parameter", [1, 2], ["(a) Mean-direction error", r"(b) $L^1$ distance to reference"]),
             ("smoothing_runtime_accuracy_summary", [0, 3, 4], ["(a) Runtime scaling", "(b) Mean-direction error", r"(c) $L^1$ distance to reference"]),
-        ]:
+        ]):
             width = (TEXT_WIDTH - 0.14 * (len(indices) - 1)) / len(indices)
             panels = []
             for number, (index, title) in enumerate(zip(indices, titles)):
@@ -237,23 +239,35 @@ def main() -> None:
             path = output / f"{name}.pdf"
             assemble(panels, path, legend=True)
             generated.append(path)
-        path = output / "smoothing_space_time.pdf"
-        hero(path, directory)
-        generated.append(path)
+    generated.extend(hero(output / "smoothing_space_time.pdf"))
     if hashes != {path.name: digest(path) for path in inputs}:
         raise RuntimeError("Rendering changed numerical inputs")
     try:
         revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[1], text=True, stderr=subprocess.DEVNULL).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         revision = "unknown"
-    manifest = {"schema_version": 1, "renderer_commit": revision,
-                "style_reference": "FlorianPfaff/S3F-Improved-Paper@044914c0b002816a6fa3a8a86d55d03831cf0d50",
-                "inputs_sha256": hashes, "pdf_sha256": {p.name: digest(p) for p in generated},
-                "accuracy_statistic": "arithmetic mean; PF IQR endpoints", "runtime_statistic": "median and IQR",
-                "line_order": "increasing grid/particle count; no coordinate jitter",
-                "reference_diagnostics": {"mean_error_rad": reference_mean, "l1_error": reference_l1},
-                "plotted_rows": rows}
-    (output / "publication_manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if not args.only_space_time:
+        manifest = {"schema_version": 1, "renderer_commit": revision,
+                    "style_reference": "FlorianPfaff/S3F-Improved-Paper@044914c0b002816a6fa3a8a86d55d03831cf0d50",
+                    "inputs_sha256": hashes, "pdf_sha256": {},
+                    "accuracy_statistic": "arithmetic mean; PF IQR endpoints", "runtime_statistic": "median and IQR",
+                    "line_order": "increasing grid/particle count; no coordinate jitter",
+                    "reference_diagnostics": {"mean_error_rad": reference_mean, "l1_error": reference_l1},
+                    "plotted_rows": rows}
+    manifest["pdf_sha256"].update({p.name: digest(p) for p in generated})
+    manifest["space_time_subfigures"] = {
+        "renderer": "scripts/render_publication_figures.py",
+        "renderer_base_commit": revision,
+        "sources_sha256": {name: digest(Path(__file__).with_name(name)) for name in
+                           ("render_publication_figures.py", "plot_smoothing_hero.py", "paper_plot_style.py")},
+        "panel_width_pdf_pt": SPACE_TIME_WIDTH * 72,
+        "panel_height_pdf_pt": SPACE_TIME_HEIGHT * 72,
+        "case": SPACE_TIME_CASE,
+        "normalization": "independent min-max rescaling within each time column",
+        "colorbar": "horizontal, above each heatmap; relative value",
+        "captions": "LaTeX subfloats; no embedded panel titles",
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     for path in generated:
         print(path)
 
