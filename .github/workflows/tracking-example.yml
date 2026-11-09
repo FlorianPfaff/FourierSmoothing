@@ -1,0 +1,41 @@
+name: Tracking example figures
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/plot_tracking_example.py'
+      - 'scripts/TRACKING_EXAMPLE.md'
+      - 'tests/test_tracking_example.py'
+      - 'src/fourier_smoothing/**'
+      - 'pyproject.toml'
+      - '.github/workflows/tracking-example.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  figures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package and plotting dependencies
+        run: python -m pip install -e '.[paper]'
+      - name: Reproduce default 500-trial tracking example
+        run: python scripts/plot_tracking_example.py --output-dir generated_tracking_example
+      - name: Upload figures and numerical provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: fourier-smoothing-tracking-example
+          path: generated_tracking_example/
+          if-no-files-found: error
