@@ -18,7 +18,6 @@ import tempfile
 import pymupdf as fitz
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 
 from paper_plot_style import (TEXT_WIDTH, COLUMN_WIDTH, DRAW_ORDER,
                               COLORS, configure, line_style, style_axis, legend_handles)
@@ -101,7 +100,7 @@ def chart(rows, metric: str, by_runtime: bool, reference: float | None,
         plotted_x.extend(x)
         plotted_y.extend(y)
     if reference is not None:
-        ax.axhline(reference, color="0.45", linestyle=(0, (3, 2)), linewidth=0.85, zorder=1)
+        # Retain the validated axis scale without drawing a reference guide line.
         plotted_y.append(reference)
     if min(plotted_x) <= 0 or min(plotted_y) <= 0:
         raise ValueError("Logarithmic publication plots require strictly positive values")
@@ -139,9 +138,7 @@ def assemble(panels: list[Path], target: Path, *, legend: bool) -> None:
     if legend:
         fig = plt.figure(figsize=(TEXT_WIDTH, 23 / 72))
         handles = legend_handles()
-        handles.append(Line2D([], [], color="0.45", linestyle=(0, (3, 2)), linewidth=0.85,
-                              label="reference diagnostic"))
-        fig.legend(handles=handles, loc="center", ncol=5, frameon=False,
+        fig.legend(handles=handles, loc="center", ncol=4, frameon=False,
                    handlelength=2.1, columnspacing=1.1, handletextpad=0.4)
         with tempfile.TemporaryDirectory() as directory:
             legend_path = Path(directory) / "legend.pdf"
