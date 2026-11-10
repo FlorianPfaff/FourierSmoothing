@@ -53,6 +53,8 @@ def test_final_size_rendering_preserves_frozen_evidence(tmp_path: Path) -> None:
                      for line in block["lines"] for span in line["spans"] if span["text"].strip()]
             assert spans
             assert min(span["size"] for span in spans) >= 4.8  # Math superscripts are smaller.
+            if name in {"smoothing_accuracy_by_parameter.pdf", "smoothing_runtime_accuracy_summary.pdf"}:
+                assert "reference diagnostic" not in page.get_text()
             if space_time_panel:
                 assert all(page.rect.contains(fitz.Rect(span["bbox"])) for span in spans)
                 assert page.rect.height == pytest.approx(profile["panel_height_pdf_pt"])
@@ -125,6 +127,30 @@ def test_space_time_panels_preserve_fields_and_mean_traces(tmp_path, monkeypatch
     assert len(captured) == 3
     assert len(paths) == 4
 
+
+
+def test_reference_diagnostics_are_not_drawn_as_guides(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.syspath_prepend(str(ROOT / "scripts"))
+    import render_publication_figures as renderer
+    from plot_runtime_accuracy_column import _read_rows
+
+    renderer.configure()
+    rows = _read_rows(ROOT / "paper_evidence/smoothing_evaluation_summary.csv")
+    captured = []
+
+    def inspect_save(fig, path):
+        ax = fig.axes[0]
+        # Only the four method curves are present, without an extra reference line.
+        assert len(ax.lines) == 4
+        assert all(line.get_color() != "0.45" for line in ax.lines)
+        captured.append(path)
+
+    monkeypatch.setattr(renderer, "save", inspect_save)
+    renderer.chart(rows, "mean_error_rad", False, 0.003,
+                   tmp_path / "error.pdf", renderer.COLUMN_WIDTH, 2.45)
+    renderer.chart(rows, "l1_error", True, 0.002,
+                   tmp_path / "l1.pdf", renderer.COLUMN_WIDTH, 2.45)
+    assert len(captured) == 2
 
 def test_shared_style_keeps_overlapping_methods_distinguishable() -> None:
     spec = importlib.util.spec_from_file_location("publication_style", ROOT / "scripts/paper_plot_style.py")
