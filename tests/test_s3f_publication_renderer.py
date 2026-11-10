@@ -153,6 +153,33 @@ def test_reference_diagnostics_are_not_drawn_as_guides(tmp_path: Path, monkeypat
                    tmp_path / "l1.pdf", renderer.COLUMN_WIDTH, 2.45)
     assert len(captured) == 2
 
+
+def test_runtime_iqr_bars_only_for_pf(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.syspath_prepend(str(ROOT / "scripts"))
+    import render_publication_figures as renderer
+    from plot_runtime_accuracy_column import _read_rows
+
+    rows = _read_rows(ROOT / "paper_evidence/smoothing_evaluation_summary.csv")
+    renderer.configure()
+    calls = []
+
+    def record_interval(ax, x, y, low, high, *, horizontal, color):
+        calls.append((horizontal, color))
+
+    monkeypatch.setattr(renderer, "interval_bars", record_interval)
+    monkeypatch.setattr(renderer, "save", lambda fig, path: renderer.plt.close(fig))
+
+    for metric, by_runtime, expected in [
+        ("runtime_s_median", False, [(False, renderer.COLORS["PF"])]),
+        ("mean_error_rad", True, [(True, renderer.COLORS["PF"])]),
+        ("l1_error", True, [(True, renderer.COLORS["PF"])]),
+        ("mean_error_rad", False, []),
+    ]:
+        calls.clear()
+        renderer.chart(rows, metric, by_runtime, None,
+                       tmp_path / "checked.pdf", renderer.COLUMN_WIDTH, 2.45)
+        assert calls == expected, (metric, by_runtime, calls)
+
 def test_shared_style_keeps_overlapping_methods_distinguishable() -> None:
     spec = importlib.util.spec_from_file_location("publication_style", ROOT / "scripts/paper_plot_style.py")
     module = importlib.util.module_from_spec(spec)
