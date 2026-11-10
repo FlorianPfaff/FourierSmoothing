@@ -85,14 +85,15 @@ def chart(rows, metric: str, by_runtime: bool, reference: float | None,
         if by_runtime:
             low = np.array([1000 * r["runtime_s_q25"] for r in selected])
             high = np.array([1000 * r["runtime_s_q75"] for r in selected])
-            interval_bars(ax, x, y, low, high, horizontal=True, color=COLORS[method])
+            if method == "PF":
+                interval_bars(ax, x, y, low, high, horizontal=True, color=COLORS[method])
             plotted_x.extend([*low, *high])
         if runtime_panel or method == "PF":
             key = "runtime_s" if runtime_panel else metric
             scale = 1000 if runtime_panel else 1
             low = np.array([scale * r[f"{key}_q25"] for r in selected])
             high = np.array([scale * r[f"{key}_q75"] for r in selected])
-            if runtime_panel:
+            if runtime_panel and method == "PF":
                 interval_bars(ax, x, y, low, high, horizontal=False, color=COLORS[method])
             # Preserve the original axis limits, including the hidden accuracy IQR endpoints.
             plotted_y.extend([*low, *high])
