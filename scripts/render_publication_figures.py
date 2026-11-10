@@ -93,7 +93,9 @@ def chart(rows, metric: str, by_runtime: bool, reference: float | None,
             scale = 1000 if runtime_panel else 1
             low = np.array([scale * r[f"{key}_q25"] for r in selected])
             high = np.array([scale * r[f"{key}_q75"] for r in selected])
-            interval_bars(ax, x, y, low, high, horizontal=False, color=COLORS[method])
+            if runtime_panel:
+                interval_bars(ax, x, y, low, high, horizontal=False, color=COLORS[method])
+            # Preserve the original axis limits, including the hidden accuracy IQR endpoints.
             plotted_y.extend([*low, *high])
         ax.plot(x, y, zorder=5 if method == "FIGFAN" else 4, **line_style(method))
         plotted_x.extend(x)
@@ -106,7 +108,7 @@ def chart(rows, metric: str, by_runtime: bool, reference: float | None,
     ax.set(xscale="log", yscale="log",
            xlim=(min(plotted_x) * 0.72, max(plotted_x) * 1.35),
            ylim=(min(plotted_y) * 0.58, max(plotted_y) * 1.6))
-    ax.set_xlabel("median runtime / ms" if by_runtime else r"grid points $L$ / particles $N$", labelpad=2)
+    ax.set_xlabel("median runtime / ms" if by_runtime else r"grid points $M$ or particles $N$", labelpad=2)
     ax.set_ylabel({"runtime_s_median": "median runtime / ms", "mean_error_rad": "mean error / rad",
                    "l1_error": r"mean $L^1$ distance"}[metric], labelpad=2)
     if title:
@@ -250,7 +252,7 @@ def main() -> None:
         manifest = {"schema_version": 1, "renderer_commit": revision,
                     "style_reference": "FlorianPfaff/S3F-Improved-Paper@044914c0b002816a6fa3a8a86d55d03831cf0d50",
                     "inputs_sha256": hashes, "pdf_sha256": {},
-                    "accuracy_statistic": "arithmetic mean; PF IQR endpoints", "runtime_statistic": "median and IQR",
+                    "accuracy_statistic": "arithmetic mean; accuracy IQRs not displayed", "runtime_statistic": "median and IQR",
                     "line_order": "increasing grid/particle count; no coordinate jitter",
                     "reference_diagnostics": {"mean_error_rad": reference_mean, "l1_error": reference_l1},
                     "plotted_rows": rows}
