@@ -140,8 +140,9 @@ def test_reference_diagnostics_are_not_drawn_as_guides(tmp_path: Path, monkeypat
 
     def inspect_save(fig, path):
         ax = fig.axes[0]
-        # Only the four method curves are present, without an extra reference line.
-        assert len(ax.lines) == 4
+        # Four method curves remain. Runtime IQR cap markers also appear as lines.
+        curves = [line for line in ax.lines if line.get_marker() in {"o", "s", "D", "^"}]
+        assert len(curves) == 4
         assert all(line.get_color() != "0.45" for line in ax.lines)
         captured.append(path)
 
